@@ -45,8 +45,11 @@ void ASIC_result_task(void *pvParameters)
 
         uint8_t job_id = asic_result->job_id;
 
+        pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
+
         if (GLOBAL_STATE->valid_jobs[job_id] == 0)
         {
+            pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
             ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
             continue;
         }
@@ -74,10 +77,14 @@ void ASIC_result_task(void *pvParameters)
                 asic_result->nonce,
                 asic_result->rolled_version ^ GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version);
 
+            pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+
             if (ret < 0) {
                 ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
                 stratum_close_connection(GLOBAL_STATE);
             }
+        } else {
+            pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
         }
 
         SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, job_id);

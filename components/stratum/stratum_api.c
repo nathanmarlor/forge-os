@@ -85,6 +85,13 @@ char * STRATUM_V1_receive_jsonrpc_line(int sockfd)
                     json_rpc_buffer=0;
                 }
                 return 0;
+            } else if (nbytes == 0) {
+                // Pool closed the connection gracefully
+                ESP_LOGI(TAG, "Connection closed by remote host");
+                if (json_rpc_buffer) {
+                    memset(json_rpc_buffer, 0, json_rpc_buffer_size);
+                }
+                return 0;
             }
 
             realloc_json_buffer(nbytes);
@@ -96,7 +103,7 @@ char * STRATUM_V1_receive_jsonrpc_line(int sockfd)
     line = strdup(tok);
     int len = strlen(line);
     if (buflen > len + 1)
-        memmove(json_rpc_buffer, json_rpc_buffer + len + 1, buflen - len + 1);
+        memmove(json_rpc_buffer, json_rpc_buffer + len + 1, buflen - len - 1);
     else
         strcpy(json_rpc_buffer, "");
     return line;
@@ -104,6 +111,11 @@ char * STRATUM_V1_receive_jsonrpc_line(int sockfd)
 
 void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
 {
+    if (message->error_str) {
+        free(message->error_str);
+        message->error_str = NULL;
+    }
+
     cJSON * json = cJSON_Parse(stratum_json);
 
     cJSON * id_json = cJSON_GetObjectItem(json, "id");
@@ -145,21 +157,22 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         // if it's an error, then it's a fail
         } else if (!cJSON_IsNull(error_json)) {
             message->response_success = false;
-            message->error_str = strdup("unknown");
             if (parsed_id < 5) {
                 result = STRATUM_RESULT_SETUP;
             } else {
                 result = STRATUM_RESULT;
             }
+            const char *err_str = "unknown";
             if (cJSON_IsArray(error_json)) {
                 int len = cJSON_GetArraySize(error_json);
                 if (len >= 2) {
                     cJSON * error_msg = cJSON_GetArrayItem(error_json, 1);
                     if (cJSON_IsString(error_msg)) {
-                        message->error_str = strdup(cJSON_GetStringValue(error_msg));
+                        err_str = cJSON_GetStringValue(error_msg);
                     }
                 }
             }
+            message->error_str = strdup(err_str);
 
         // if the result is a boolean, then parse it
         } else if (cJSON_IsBool(result_json)) {
@@ -172,10 +185,11 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
                 message->response_success = true;
             } else {
                 message->response_success = false;
-                message->error_str = strdup("unknown");
+                const char *reject_str = "unknown";
                 if (cJSON_IsString(reject_reason_json)) {
-                    message->error_str = strdup(cJSON_GetStringValue(reject_reason_json));
-                }                
+                    reject_str = cJSON_GetStringValue(reject_reason_json);
+                }
+                message->error_str = strdup(reject_str);
             }
         
         //if the id is STRATUM_ID_SUBSCRIBE parse it
@@ -224,45 +238,70 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
 
     if (message->method == MINING_NOTIFY) {
 
-        mining_notify * new_work = malloc(sizeof(mining_notify));
-        // new_work->difficulty = difficulty;
         cJSON * params = cJSON_GetObjectItem(json, "params");
-        new_work->job_id = strdup(cJSON_GetArrayItem(params, 0)->valuestring);
-        new_work->prev_block_hash = strdup(cJSON_GetArrayItem(params, 1)->valuestring);
-        new_work->coinbase_1 = strdup(cJSON_GetArrayItem(params, 2)->valuestring);
-        new_work->coinbase_2 = strdup(cJSON_GetArrayItem(params, 3)->valuestring);
+        cJSON *p0 = params ? cJSON_GetArrayItem(params, 0) : NULL;
+        cJSON *p1 = params ? cJSON_GetArrayItem(params, 1) : NULL;
+        cJSON *p2 = params ? cJSON_GetArrayItem(params, 2) : NULL;
+        cJSON *p3 = params ? cJSON_GetArrayItem(params, 3) : NULL;
+        cJSON *p4 = params ? cJSON_GetArrayItem(params, 4) : NULL;
+        cJSON *p5 = params ? cJSON_GetArrayItem(params, 5) : NULL;
+        cJSON *p6 = params ? cJSON_GetArrayItem(params, 6) : NULL;
+        cJSON *p7 = params ? cJSON_GetArrayItem(params, 7) : NULL;
+        if (!p0 || !p1 || !p2 || !p3 || !p4 || !p5 || !p6 || !p7) {
+            ESP_LOGE(TAG, "MINING_NOTIFY: malformed params: %s", stratum_json);
+            goto done;
+        }
 
-        cJSON * merkle_branch = cJSON_GetArrayItem(params, 4);
-        new_work->n_merkle_branches = cJSON_GetArraySize(merkle_branch);
+        mining_notify * new_work = malloc(sizeof(mining_notify));
+        new_work->job_id = strdup(p0->valuestring);
+        new_work->prev_block_hash = strdup(p1->valuestring);
+        new_work->coinbase_1 = strdup(p2->valuestring);
+        new_work->coinbase_2 = strdup(p3->valuestring);
+
+        new_work->n_merkle_branches = cJSON_GetArraySize(p4);
         if (new_work->n_merkle_branches > MAX_MERKLE_BRANCHES) {
-            printf("Too many Merkle branches.\n");
-            abort();
+            ESP_LOGE(TAG, "Too many Merkle branches: %d", new_work->n_merkle_branches);
+            free(new_work->job_id);
+            free(new_work->prev_block_hash);
+            free(new_work->coinbase_1);
+            free(new_work->coinbase_2);
+            free(new_work);
+            goto done;
         }
         new_work->merkle_branches = malloc(HASH_SIZE * new_work->n_merkle_branches);
         for (size_t i = 0; i < new_work->n_merkle_branches; i++) {
-            hex2bin(cJSON_GetArrayItem(merkle_branch, i)->valuestring, new_work->merkle_branches + HASH_SIZE * i, HASH_SIZE);
+            cJSON *branch = cJSON_GetArrayItem(p4, i);
+            if (branch) {
+                hex2bin(branch->valuestring, new_work->merkle_branches + HASH_SIZE * i, HASH_SIZE);
+            }
         }
 
-        new_work->version = strtoul(cJSON_GetArrayItem(params, 5)->valuestring, NULL, 16);
-        new_work->target = strtoul(cJSON_GetArrayItem(params, 6)->valuestring, NULL, 16);
-        new_work->ntime = strtoul(cJSON_GetArrayItem(params, 7)->valuestring, NULL, 16);
+        new_work->version = strtoul(p5->valuestring, NULL, 16);
+        new_work->target = strtoul(p6->valuestring, NULL, 16);
+        new_work->ntime = strtoul(p7->valuestring, NULL, 16);
 
         message->mining_notification = new_work;
 
-        // params can be varible length
+        // params can be variable length
         int paramsLength = cJSON_GetArraySize(params);
-        int value = cJSON_IsTrue(cJSON_GetArrayItem(params, paramsLength - 1));
-        message->should_abandon_work = value;
+        cJSON *lastParam = cJSON_GetArrayItem(params, paramsLength - 1);
+        message->should_abandon_work = lastParam ? cJSON_IsTrue(lastParam) : false;
     } else if (message->method == MINING_SET_DIFFICULTY) {
         cJSON * params = cJSON_GetObjectItem(json, "params");
-        uint32_t difficulty = cJSON_GetArrayItem(params, 0)->valueint;
-
-        message->new_difficulty = difficulty;
+        cJSON * p0 = params ? cJSON_GetArrayItem(params, 0) : NULL;
+        if (p0 == NULL) {
+            ESP_LOGE(TAG, "MINING_SET_DIFFICULTY: missing params");
+            goto done;
+        }
+        message->new_difficulty = p0->valueint;
     } else if (message->method == MINING_SET_VERSION_MASK) {
-
         cJSON * params = cJSON_GetObjectItem(json, "params");
-        uint32_t version_mask = strtoul(cJSON_GetArrayItem(params, 0)->valuestring, NULL, 16);
-        message->version_mask = version_mask;
+        cJSON * p0 = params ? cJSON_GetArrayItem(params, 0) : NULL;
+        if (p0 == NULL) {
+            ESP_LOGE(TAG, "MINING_SET_VERSION_MASK: missing params");
+            goto done;
+        }
+        message->version_mask = strtoul(p0->valuestring, NULL, 16);
     }
     done:
     cJSON_Delete(json);
@@ -317,7 +356,7 @@ int STRATUM_V1_subscribe(int socket, int send_uid, char * model)
     char subscribe_msg[BUFFER_SIZE];
     const esp_app_desc_t *app_desc = esp_app_get_description();
     const char *version = app_desc->version;	
-    sprintf(subscribe_msg, "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitforge/%s/%s\"]}\n", send_uid, model, version);
+    snprintf(subscribe_msg, sizeof(subscribe_msg), "{\"id\": %d, \"method\": \"mining.subscribe\", \"params\": [\"bitforge/%s/%s\"]}\n", send_uid, model, version);
     debug_stratum_tx(subscribe_msg);
 
     return write(socket, subscribe_msg, strlen(subscribe_msg));
@@ -326,7 +365,7 @@ int STRATUM_V1_subscribe(int socket, int send_uid, char * model)
 int STRATUM_V1_suggest_difficulty(int socket, int send_uid, uint32_t difficulty)
 {
     char difficulty_msg[BUFFER_SIZE];
-    sprintf(difficulty_msg, "{\"id\": %d, \"method\": \"mining.suggest_difficulty\", \"params\": [%ld]}\n", send_uid, difficulty);
+    snprintf(difficulty_msg, sizeof(difficulty_msg), "{\"id\": %d, \"method\": \"mining.suggest_difficulty\", \"params\": [%ld]}\n", send_uid, difficulty);
     debug_stratum_tx(difficulty_msg);
 
     return write(socket, difficulty_msg, strlen(difficulty_msg));
@@ -335,7 +374,7 @@ int STRATUM_V1_suggest_difficulty(int socket, int send_uid, uint32_t difficulty)
 int STRATUM_V1_extranonce_subscribe(int socket, int send_uid)
 {
     char msg[BUFFER_SIZE];
-    sprintf(msg, "{\"id\": %d, \"method\": \"mining.extranonce.subscribe\", \"params\": []}\n", send_uid);
+    snprintf(msg, sizeof(msg), "{\"id\": %d, \"method\": \"mining.extranonce.subscribe\", \"params\": []}\n", send_uid);
     debug_stratum_tx(msg);
 
     return write(socket, msg, strlen(msg));
@@ -344,7 +383,7 @@ int STRATUM_V1_extranonce_subscribe(int socket, int send_uid)
 int STRATUM_V1_authenticate(int socket, int send_uid, const char * username, const char * pass)
 {
     char authorize_msg[BUFFER_SIZE];
-    sprintf(authorize_msg, "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"%s\"]}\n", send_uid, username,
+    snprintf(authorize_msg, sizeof(authorize_msg), "{\"id\": %d, \"method\": \"mining.authorize\", \"params\": [\"%s\", \"%s\"]}\n", send_uid, username,
             pass);
     debug_stratum_tx(authorize_msg);
 
@@ -362,7 +401,7 @@ int STRATUM_V1_submit_share(int socket, int send_uid, const char * username, con
                             const uint32_t nonce, const uint32_t version)
 {
     char submit_msg[BUFFER_SIZE];
-    sprintf(submit_msg,
+    snprintf(submit_msg, sizeof(submit_msg),
             "{\"id\": %d, \"method\": \"mining.submit\", \"params\": [\"%s\", \"%s\", \"%s\", \"%08lx\", \"%08lx\", \"%08lx\"]}\n",
             send_uid, username, jobid, extranonce_2, ntime, nonce, version);
     debug_stratum_tx(submit_msg);
