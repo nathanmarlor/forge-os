@@ -75,6 +75,13 @@ export interface ISystemInfo {
     scriptsig?: string,
     networkDifficulty?: number,
 
+    blockFound?: boolean,
+    fanTargetTemp?: number,
+    fanMinSpeed?: number,
+
+    coinbaseOutputs?: { valueSatoshis: number, address: string, isUserOutput: boolean }[],
+    coinbaseValueTotal?: number,
+
     hashrateMonitor?: {
         asics: IHashrateMonitorAsic[];
     },
