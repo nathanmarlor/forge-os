@@ -312,5 +312,32 @@
                 </div>
             </div>
         </div>
+
+        <div class="info-card" *ngIf="info.blockHeight">
+            <div class="info-header">
+                <i class="pi pi-cube info-icon"></i>
+                <span class="info-title">Block Header</span>
+            </div>
+            <div class="info-content">
+                <div class="info-item">
+                    <span class="info-label">Height</span>
+                    <span class="info-value">{{info.blockHeight | number:'1.0-0'}}</span>
+                </div>
+                <div class="info-item" *ngIf="info.networkDifficulty">
+                    <span class="info-label">Network Diff</span>
+                    <span class="info-value"
+                          [pTooltip]="(info.networkDifficulty | number:'1.0-0')"
+                          tooltipPosition="top">
+                        {{info.networkDifficulty | diffSuffix}}
+                    </span>
+                </div>
+                <div class="info-item" *ngIf="info.scriptsig">
+                    <span class="info-label">Scriptsig</span>
+                    <span class="info-value" style="font-family: monospace; font-size: 0.8rem; word-break: break-all;">
+                        {{info.scriptsig}}
+                    </span>
+                </div>
+            </div>
+        </div>
     </div>
 </ng-container>
