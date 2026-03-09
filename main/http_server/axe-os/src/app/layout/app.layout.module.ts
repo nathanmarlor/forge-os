@@ -6,6 +6,7 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterModule } from '@angular/router';
 import { InputTextModule } from 'primeng/inputtext';
 import { SidebarModule } from 'primeng/sidebar';
+import { TooltipModule } from 'primeng/tooltip';
 
 import { PrimeNGModule } from '../prime-ng.module';
 import { AppFooterComponent } from './app.footer.component';
@@ -31,6 +32,7 @@ import { AppTopBarComponent } from './app.topbar.component';
         BrowserAnimationsModule,
         InputTextModule,
         SidebarModule,
+        TooltipModule,
         RouterModule,
         PrimeNGModule,
 

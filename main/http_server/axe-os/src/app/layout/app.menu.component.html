@@ -16,11 +16,19 @@
     </ng-container>
 </div>
 
-<!-- Restart Button -->
-<div class="restart-section">
-    <button 
+<!-- Reset Reason + Restart -->
+<div class="restart-section" *ngIf="info$ | async as info">
+    <div *ngIf="info.resetReason"
+        class="reset-reason-button"
+        [ngClass]="getResetReasonClass(info.resetReason)"
+        [pTooltip]="getResetReasonTooltip(info.resetReason)"
+        tooltipPosition="right">
+        <i class="pi pi-history menu-icon"></i>
+        <span>Last Reset: {{info.resetReason}}</span>
+    </div>
+    <button
         class="restart-button"
-        (click)="restart()" 
+        (click)="restart()"
         type="button">
         <i class="pi pi-refresh menu-icon"></i>
         <span>Restart System</span>
