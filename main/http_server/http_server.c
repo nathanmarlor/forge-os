@@ -853,14 +853,6 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
     }
 
-    wifi_mode_t mode;
-    esp_wifi_get_mode(&mode);
-    if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
-    {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not allowed in AP mode");
-        return ESP_OK;
-    }
-
     GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "www.bin");
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
@@ -935,12 +927,12 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
 
     wifi_mode_t mode;
     esp_wifi_get_mode(&mode);
-    if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA)
+    if (mode == WIFI_MODE_AP)
     {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not allowed in AP mode");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Not allowed in AP-only mode");
         return ESP_OK;
     }
-    
+
     GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = true;
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, 20, "bitforgeos.bin");
     snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Starting...");
