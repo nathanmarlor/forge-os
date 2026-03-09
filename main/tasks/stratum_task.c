@@ -141,7 +141,7 @@ void stratum_primary_heartbeat(void * pvParameters)
             continue;
         }
 
-        int err = connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        int err = connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in));
         if (err != 0)
         {
             ESP_LOGD(TAG, "Heartbeat. Failed connect check: %s:%d (errno %d: %s)", host_ip, primary_stratum_port, errno, strerror(errno));
@@ -293,7 +293,7 @@ void stratum_task(void * pvParameters)
         retry_critical_attempts = 0;
 
         ESP_LOGI(TAG, "Socket created, connecting to %s:%d", host_ip, port);
-        int err = connect(GLOBAL_STATE->sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        int err = connect(GLOBAL_STATE->sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in));
         if (err != 0)
         {
             retry_attempts++;
@@ -389,6 +389,9 @@ void stratum_task(void * pvParameters)
                 GLOBAL_STATE->version_mask = stratum_api_v1_message.version_mask;
                 GLOBAL_STATE->new_stratum_version_rolling_msg = true;
             } else if (stratum_api_v1_message.method == STRATUM_RESULT_SUBSCRIBE) {
+                if (GLOBAL_STATE->extranonce_str) {
+                    free(GLOBAL_STATE->extranonce_str);
+                }
                 GLOBAL_STATE->extranonce_str = stratum_api_v1_message.extranonce_str;
                 GLOBAL_STATE->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
             } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {

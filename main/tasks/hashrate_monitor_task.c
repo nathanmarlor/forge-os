@@ -98,14 +98,51 @@ void hashrate_monitor_task(void *pvParameters)
     int hash_domains = BM1370_HASH_DOMAINS;
 
     HASHRATE_MONITOR_MODULE->total_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
+    if (HASHRATE_MONITOR_MODULE->total_measurement == NULL) {
+        ESP_LOGW(TAG, "SPIRAM unavailable for total_measurement, falling back to internal heap");
+        HASHRATE_MONITOR_MODULE->total_measurement = malloc(asic_count * sizeof(measurement_t));
+    }
+    if (HASHRATE_MONITOR_MODULE->total_measurement == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate total_measurement");
+        vTaskDelete(NULL);
+        return;
+    }
+
     if (hash_domains > 0) {
         measurement_t* data = malloc(asic_count * hash_domains * sizeof(measurement_t));
+        if (data == NULL) {
+            ESP_LOGE(TAG, "Failed to allocate domain measurement data");
+            vTaskDelete(NULL);
+            return;
+        }
         HASHRATE_MONITOR_MODULE->domain_measurements = heap_caps_malloc(hash_domains * sizeof(measurement_t*), MALLOC_CAP_SPIRAM);
+        if (HASHRATE_MONITOR_MODULE->domain_measurements == NULL) {
+            ESP_LOGW(TAG, "SPIRAM unavailable for domain_measurements, falling back to internal heap");
+            HASHRATE_MONITOR_MODULE->domain_measurements = malloc(hash_domains * sizeof(measurement_t*));
+        }
+        if (HASHRATE_MONITOR_MODULE->domain_measurements == NULL) {
+            ESP_LOGE(TAG, "Failed to allocate domain_measurements");
+            free(data);
+            vTaskDelete(NULL);
+            return;
+        }
         for (size_t i = 0; i < hash_domains; i++) {
             HASHRATE_MONITOR_MODULE->domain_measurements[i] = data + (i * asic_count);
         }
     }
+
     HASHRATE_MONITOR_MODULE->error_measurement = heap_caps_malloc(asic_count * sizeof(measurement_t), MALLOC_CAP_SPIRAM);
+    if (HASHRATE_MONITOR_MODULE->error_measurement == NULL) {
+        ESP_LOGW(TAG, "SPIRAM unavailable for error_measurement, falling back to internal heap");
+        HASHRATE_MONITOR_MODULE->error_measurement = malloc(asic_count * sizeof(measurement_t));
+    }
+    if (HASHRATE_MONITOR_MODULE->error_measurement == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate error_measurement");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    pthread_mutex_init(&HASHRATE_MONITOR_MODULE->measurement_lock, NULL);
 
     clear_measurements(HASHRATE_MONITOR_MODULE, asic_count, hash_domains);
 
@@ -119,7 +156,12 @@ void hashrate_monitor_task(void *pvParameters)
 
         vTaskDelay(100 / portTICK_PERIOD_MS);
 
+        pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->measurement_lock);
         float hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
+        float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
+        uint32_t error_count = sum_values(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
+        pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->measurement_lock);
+
         ESP_LOGI(TAG, "Calculated hashrate: %.2f GH/s", hashrate);
 
         if (hashrate == 0.0) {
@@ -135,12 +177,11 @@ void hashrate_monitor_task(void *pvParameters)
             }
         }
 
-        float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
         HASHRATE_MONITOR_MODULE->error_percentage = HASHRATE_MONITOR_MODULE->hashrate > 0
             ? error_hashrate / HASHRATE_MONITOR_MODULE->hashrate * 100.0f
             : 0.0f;
 
-        HASHRATE_MONITOR_MODULE->error_count = sum_values(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
+        HASHRATE_MONITOR_MODULE->error_count = error_count;
 
         vTaskDelayUntil(&taskWakeTime, POLL_RATE / portTICK_PERIOD_MS);
     }
@@ -163,6 +204,8 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
         ESP_LOGE(TAG, "Asic nr out of bounds");
         return;
     }
+
+    pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->measurement_lock);
 
     // Reset statistics on start and when frequency changes
     if (POWER_MANAGEMENT_MODULE->frequency_value != frequency_value) {
@@ -196,4 +239,6 @@ void hashrate_monitor_register_read(void *pvParameters, register_type_t register
             ESP_LOGE(TAG, "Invalid register type");
             break;
     }
+
+    pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->measurement_lock);
 }

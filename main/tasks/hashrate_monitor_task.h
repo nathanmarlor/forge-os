@@ -2,6 +2,7 @@
 #define HASHRATE_MONITOR_TASK_H_
 
 #include "common.h"
+#include <pthread.h>
 
 #define BM1370_HASH_DOMAINS 4
 
@@ -20,6 +21,7 @@ typedef struct {
     float error_percentage;
     int error_count;
     bool is_initialized;
+    pthread_mutex_t measurement_lock;
 } HashrateMonitorModule;
 
 void hashrate_monitor_task(void *pvParameters);

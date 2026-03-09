@@ -108,6 +108,10 @@ static void _send_BM1370(uint8_t header, uint8_t * data, uint8_t data_len, bool 
 
     // allocate memory for buffer
     unsigned char * buf = malloc(total_length);
+    if (buf == NULL) {
+        ESP_LOGE(TAG, "_send_BM1370: malloc failed");
+        return;
+    }
 
     // add the preamble
     buf[0] = 0x55;
@@ -142,6 +146,10 @@ static void _send_BM1370(uint8_t header, uint8_t * data, uint8_t data_len, bool 
 static void _send_simple(uint8_t * data, uint8_t total_length)
 {
     unsigned char * buf = malloc(total_length);
+    if (buf == NULL) {
+        ESP_LOGE(TAG, "_send_simple: malloc failed");
+        return;
+    }
     memcpy(buf, data, total_length);
     SERIAL_send(buf, total_length, BM1370_SERIALTX_DEBUG);
 
@@ -457,6 +465,10 @@ void BM1370_send_work(void * pvParameters, bm_job * next_bm_job)
     memcpy(job.prev_block_hash, next_bm_job->prev_block_hash_be, 32);
     memcpy(&job.version, &next_bm_job->version, 4);
 
+    pthread_mutex_lock(&GLOBAL_STATE->valid_jobs_lock);
+    GLOBAL_STATE->valid_jobs[job.job_id] = 0;
+    pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+
     if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {
         free_bm_job(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id]);
     }
@@ -487,6 +499,10 @@ task_result * BM1370_process_work(void * pvParameters)
 
     // Check if this is a register response (not a job response)
     if (!asic_result.is_job_response) {
+        if (asic_result.cmd.register_address >= sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0])) {
+            ESP_LOGW(TAG, "Register address out of bounds: %02x", asic_result.cmd.register_address);
+            return NULL;
+        }
         result.register_type = REGISTER_MAP[asic_result.cmd.register_address];
         if (result.register_type == REGISTER_INVALID) {
             ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
