@@ -2,6 +2,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
+#include "esp_system.h"
 #include "nvs_flash.h"
 
 // #include "protocol_examples_common.h"
@@ -57,6 +58,25 @@ static void ap_timeout_task(void * pvParameters)
 
 void app_main(void)
 {
+    esp_reset_reason_t reset_reason = esp_reset_reason();
+    const char * reset_reason_str;
+    switch (reset_reason) {
+        case ESP_RST_POWERON:   reset_reason_str = "Power On";                  break;
+        case ESP_RST_EXT:       reset_reason_str = "External Pin Reset";        break;
+        case ESP_RST_SW:        reset_reason_str = "Software Restart";          break;
+        case ESP_RST_PANIC:     reset_reason_str = "Crash / Panic";             break;
+        case ESP_RST_INT_WDT:   reset_reason_str = "Interrupt Watchdog";        break;
+        case ESP_RST_TASK_WDT:  reset_reason_str = "Task Watchdog (hung task)"; break;
+        case ESP_RST_WDT:       reset_reason_str = "Watchdog";                  break;
+        case ESP_RST_DEEPSLEEP: reset_reason_str = "Deep Sleep Wakeup";         break;
+        case ESP_RST_BROWNOUT:  reset_reason_str = "Brownout (low voltage)";    break;
+        case ESP_RST_SDIO:      reset_reason_str = "SDIO Reset";                break;
+        default:                reset_reason_str = "Unknown";                   break;
+    }
+    snprintf(GLOBAL_STATE.SYSTEM_MODULE.reset_reason, sizeof(GLOBAL_STATE.SYSTEM_MODULE.reset_reason),
+             "%s", reset_reason_str);
+    ESP_LOGW(TAG, "Reset reason: %s (%d)", reset_reason_str, reset_reason);
+
     ESP_LOGI(TAG, "Welcome to the bitforge nano || GTFO!");
 
     if (!esp_psram_is_initialized()) {
