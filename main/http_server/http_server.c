@@ -568,6 +568,24 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     if ((item = cJSON_GetObjectItem(root, "statsFrequency")) != NULL) {
         nvs_config_set_u16(NVS_CONFIG_STATS_FREQUENCY, item->valueint);
     }
+    if ((item = cJSON_GetObjectItem(root, "stratumSuggestedDifficulty")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_STRATUM_DIFFICULTY, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumSuggestedDifficulty")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "stratumExtranonceSubscribe")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumExtranonceSubscribe")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUB, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "stratumDecodeCoinbase")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_STRATUM_DECODE_COINBASE, item->valueint);
+    }
+    if ((item = cJSON_GetObjectItem(root, "fallbackStratumDecodeCoinbase")) != NULL) {
+        nvs_config_set_u16(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE, item->valueint);
+    }
 
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
