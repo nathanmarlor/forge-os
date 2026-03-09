@@ -864,7 +864,11 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
     }
 
     // Erase the entire www partition before writing
-    ESP_ERROR_CHECK(esp_partition_erase_range(www_partition, 0, www_partition->size));
+    if (esp_partition_erase_range(www_partition, 0, www_partition->size) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Erase Error");
+        GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update = false;
+        return ESP_OK;
+    }
 
     while (remaining > 0) {
         int recv_len = httpd_req_recv(req, buf, MIN(remaining, sizeof(buf)));
@@ -877,7 +881,8 @@ esp_err_t POST_WWW_update(httpd_req_t * req)
             return ESP_OK;
         }
 
-        if (esp_partition_write(www_partition, www_partition->size - remaining, (const void *) buf, recv_len) != ESP_OK) {
+        int offset = req->content_len - remaining;
+        if (esp_partition_write(www_partition, offset, (const void *) buf, recv_len) != ESP_OK) {
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, 20, "Write Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Write Error");
             return ESP_OK;
