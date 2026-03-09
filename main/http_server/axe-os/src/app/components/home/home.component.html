@@ -407,6 +407,73 @@
             </div>
         </div>
 
+        <div class="info-card esp-health-card">
+            <div class="info-header">
+                <i class="pi pi-microchip info-icon"></i>
+                <span class="info-title">ESP Health</span>
+            </div>
+            <div class="info-content">
+
+                <!-- Internal Heap -->
+                <div class="esp-metric">
+                    <div class="esp-metric-header">
+                        <span class="esp-metric-label">Internal Heap</span>
+                        <span class="esp-metric-value">
+                            {{info.freeHeapInternal | number:'1.0-0'}} / {{(info.totalHeapInternal || 0) | number:'1.0-0'}} B free
+                        </span>
+                    </div>
+                    <p-progressBar
+                        [value]="(info.freeHeapInternal / (info.totalHeapInternal || 1)) * 100"
+                        styleClass="custom-progress">
+                        <ng-template pTemplate="content" let-value></ng-template>
+                    </p-progressBar>
+                    <div class="esp-metric-sub" *ngIf="info.minFreeHeap != null">
+                        <span
+                            [pTooltip]="'Lowest internal heap since boot — if this keeps shrinking across restarts, suspect a memory leak'"
+                            tooltipPosition="top">
+                            Low watermark: {{info.minFreeHeap | number:'1.0-0'}} B
+                        </span>
+                        <span
+                            [pTooltip]="'Largest contiguous free block — small values indicate heap fragmentation'"
+                            tooltipPosition="top">
+                            Largest block: {{info.largestFreeBlock | number:'1.0-0'}} B
+                        </span>
+                    </div>
+                    <div class="status-warning" *ngIf="info.minFreeHeap != null && info.minFreeHeap < 20000">
+                        ⚠️ Low heap watermark — possible memory leak
+                    </div>
+                </div>
+
+                <!-- PSRAM -->
+                <div class="esp-metric" *ngIf="info.isPSRAMAvailable">
+                    <div class="esp-metric-header">
+                        <span class="esp-metric-label">PSRAM</span>
+                        <span class="esp-metric-value">
+                            {{info.freeHeapSpiram | number:'1.0-0'}} / {{(info.totalHeapSpiram || 0) | number:'1.0-0'}} B free
+                        </span>
+                    </div>
+                    <p-progressBar
+                        [value]="(info.freeHeapSpiram / (info.totalHeapSpiram || 1)) * 100"
+                        styleClass="custom-progress">
+                        <ng-template pTemplate="content" let-value></ng-template>
+                    </p-progressBar>
+                </div>
+
+                <!-- Tasks + IDF version -->
+                <div class="esp-info-row">
+                    <div class="esp-info-item" *ngIf="info.taskCount">
+                        <i class="pi pi-list"></i>
+                        <span>{{info.taskCount}} FreeRTOS tasks</span>
+                    </div>
+                    <div class="esp-info-item">
+                        <i class="pi pi-code"></i>
+                        <span>IDF {{info.idfVersion}}</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
         <div class="info-card heatmap-card" *ngIf="info.hashrateMonitor && getAsicsAmount(info) > 0">
             <div class="info-header">
                 <i class="pi pi-th-large info-icon"></i>
