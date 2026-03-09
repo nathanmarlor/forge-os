@@ -1,5 +1,6 @@
 #include "utils.h"
 
+#include <math.h>
 #include <string.h>
 #include <stdio.h>
 
