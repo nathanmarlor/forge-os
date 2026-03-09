@@ -99,10 +99,6 @@
                 }
             }
 
-            .restart-area {
-                position: relative;
-            }
-
             .restart-btn-header {
                 display: flex;
                 align-items: center;
@@ -122,20 +118,6 @@
                 }
             }
 
-            .reset-reason {
-                position: absolute;
-                top: calc(100% + 0.2rem);
-                right: 0;
-                display: flex;
-                align-items: center;
-                gap: 0.25rem;
-                font-size: 0.7rem;
-                white-space: nowrap;
-
-                &.reason-warn  { color: #f59e0b; }
-                &.reason-info  { color: #6366f1; }
-                &.reason-normal { color: #64748b; }
-            }
         }
     }
 
