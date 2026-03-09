@@ -8,7 +8,7 @@
 
 -->
 
-# Forge-OS
+# Forge-OS (Port)
 Forge-OS is a fork of the origional esp-miner it's open source firmware can be found here [ESP-Miner](https://github.com/bitaxeorg/esp-miner)
 
 If you are looking for premade images to load on your BitForge, check out the [releases](https://github.com/wantclue/forge-os/releases) page. Maybe you want [instructions](https://github.com/wantclue/forge-os/blob/master/flashing.md) for loading factory images.
