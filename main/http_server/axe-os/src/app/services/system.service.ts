@@ -68,7 +68,8 @@ export class SystemService {
 
           chiptemp1: 30,
           chiptemp2: 40,
-          overheat_mode: 0
+          overheat_mode: 0,
+          resetReason: 'Power On'
         }
       ).pipe(delay(1000));
     }

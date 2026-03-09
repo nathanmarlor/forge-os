@@ -90,4 +90,6 @@ export interface ISystemInfo {
     hashrateMonitor?: {
         asics: IHashrateMonitorAsic[];
     },
+
+    resetReason?: string,
 }

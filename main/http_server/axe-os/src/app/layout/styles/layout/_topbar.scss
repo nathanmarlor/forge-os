@@ -99,6 +99,13 @@
                 }
             }
 
+            .restart-area {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 0.25rem;
+            }
+
             .restart-btn-header {
                 display: flex;
                 align-items: center;
@@ -116,6 +123,18 @@
                     background: rgba(51, 65, 85, 0.3);
                     border-color: #475569;
                 }
+            }
+
+            .reset-reason {
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+                font-size: 0.7rem;
+                white-space: nowrap;
+
+                &.reason-warn  { color: #f59e0b; }
+                &.reason-info  { color: #6366f1; }
+                &.reason-normal { color: #64748b; }
             }
         }
     }

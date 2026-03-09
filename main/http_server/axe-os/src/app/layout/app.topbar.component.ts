@@ -44,6 +44,14 @@ export class AppTopBarComponent {
         this.toastr.success('Success!', 'BitForge restarted');
     }
 
+    public getResetReasonClass(reason: string): string {
+        if (!reason) return '';
+        const r = reason.toLowerCase();
+        if (r.includes('crash') || r.includes('panic') || r.includes('watchdog') || r.includes('brownout')) return 'reason-warn';
+        if (r.includes('software') || r.includes('external')) return 'reason-info';
+        return 'reason-normal';
+    }
+
     public getPerformanceMode(info: ISystemInfo): { label: string, class: string } {
         const freq = info.frequency;
         const voltage = info.coreVoltage;

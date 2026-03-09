@@ -10,10 +10,15 @@
                 <div class="status-dot"></div>
                 {{ getPerformanceMode(info).label }}
             </div>
-            <button class="restart-btn-header" (click)="restart()">
-                <i class="pi pi-refresh"></i>
-                Restart
-            </button>
+            <div class="restart-area">
+                <button class="restart-btn-header" (click)="restart()">
+                    <i class="pi pi-refresh"></i>
+                    Restart
+                </button>
+                <span class="reset-reason" *ngIf="info.resetReason" [ngClass]="getResetReasonClass(info.resetReason)">
+                    <i class="pi pi-history"></i> {{info.resetReason}}
+                </span>
+            </div>
         </div>
     </div>
 
