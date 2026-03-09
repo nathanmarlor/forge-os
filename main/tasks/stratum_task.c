@@ -339,9 +339,11 @@ void stratum_task(void * pvParameters)
             : GLOBAL_STATE->SYSTEM_MODULE.pool_extranonce_subscribe;
 
         //mining.suggest_difficulty - ID: 4
-        if (suggested_difficulty > 0) {
-            STRATUM_V1_suggest_difficulty(GLOBAL_STATE->sock, GLOBAL_STATE->send_uid++, suggested_difficulty);
+        // Use NVS override if set, otherwise fall back to compiled-in default
+        if (suggested_difficulty == 0) {
+            suggested_difficulty = STRATUM_DIFFICULTY;
         }
+        STRATUM_V1_suggest_difficulty(GLOBAL_STATE->sock, GLOBAL_STATE->send_uid++, suggested_difficulty);
 
         //mining.extranonce.subscribe
         if (extranonce_subscribe) {
