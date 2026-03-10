@@ -380,10 +380,16 @@ void stratum_task(void * pvParameters)
                 stratum_api_v1_message.mining_notification->difficulty = SYSTEM_TASK_MODULE.stratum_difficulty;
                 queue_enqueue(&GLOBAL_STATE->stratum_queue, stratum_api_v1_message.mining_notification);
             } else if (stratum_api_v1_message.method == MINING_SET_DIFFICULTY) {
-                if (stratum_api_v1_message.new_difficulty > 0 &&
-                        stratum_api_v1_message.new_difficulty != SYSTEM_TASK_MODULE.stratum_difficulty) {
-                    SYSTEM_TASK_MODULE.stratum_difficulty = stratum_api_v1_message.new_difficulty;
-                    ESP_LOGI(TAG, "Set stratum difficulty: %ld", SYSTEM_TASK_MODULE.stratum_difficulty);
+                uint32_t new_diff = stratum_api_v1_message.new_difficulty;
+                if (new_diff > 0) {
+                    if (new_diff < suggested_difficulty) {
+                        ESP_LOGW(TAG, "Pool difficulty %lu below suggested %u, clamping", new_diff, suggested_difficulty);
+                        new_diff = suggested_difficulty;
+                    }
+                    if (new_diff != SYSTEM_TASK_MODULE.stratum_difficulty) {
+                        SYSTEM_TASK_MODULE.stratum_difficulty = new_diff;
+                        ESP_LOGI(TAG, "Set stratum difficulty: %lu", SYSTEM_TASK_MODULE.stratum_difficulty);
+                    }
                 }
             } else if (stratum_api_v1_message.method == MINING_SET_VERSION_MASK ||
                     stratum_api_v1_message.method == STRATUM_RESULT_VERSION_MASK) {
