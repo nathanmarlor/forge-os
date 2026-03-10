@@ -9,6 +9,7 @@ interface IHashrateMonitorAsic {
     total: number;
     domains: number[];
     errorCount: number;
+    errorRate: number;
 }
 
 export interface ISystemInfo {
@@ -87,6 +88,9 @@ export interface ISystemInfo {
     fanTargetTemp?: number,
     fanMinSpeed?: number,
     responseTime?: number,
+    responseTimeMin?: number,
+    responseTimeMax?: number,
+    responseTimeP95?: number,
     statsFrequency?: number,
 
     coinbaseOutputs?: { valueSatoshis: number, address: string, isUserOutput: boolean }[],

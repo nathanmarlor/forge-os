@@ -139,6 +139,42 @@
             </div>
         </div>
 
+        <!-- Pool Latency -->
+        <div class="stat-card" *ngIf="info.responseTime && info.responseTime > 0">
+            <div class="card-header">
+                <i class="pi pi-wifi card-icon"></i>
+                <span class="card-title">Pool Latency</span>
+            </div>
+            <div class="card-content">
+                <div class="metric-rows">
+                    <div class="metric-row"
+                         [pTooltip]="'Smoothed average response time (exponential moving average, α=0.1)'"
+                         tooltipPosition="top">
+                        <span class="metric-label">EMA</span>
+                        <span class="metric-value">{{ info.responseTime | number:'1.0-0' }} ms</span>
+                    </div>
+                    <div class="metric-row" *ngIf="info.responseTimeMin"
+                         [pTooltip]="'Fastest pool acknowledgement this session'"
+                         tooltipPosition="top">
+                        <span class="metric-label">Min</span>
+                        <span class="metric-value">{{ info.responseTimeMin | number:'1.0-0' }} ms</span>
+                    </div>
+                    <div class="metric-row" *ngIf="info.responseTimeMax"
+                         [pTooltip]="'Slowest pool acknowledgement this session'"
+                         tooltipPosition="top">
+                        <span class="metric-label">Max</span>
+                        <span class="metric-value" [class.metric-value--warn]="(info.responseTimeMax || 0) > 5000">{{ info.responseTimeMax | number:'1.0-0' }} ms</span>
+                    </div>
+                    <div class="metric-row" *ngIf="info.responseTimeP95"
+                         [pTooltip]="'95th percentile — 95% of shares were acknowledged within this time. Ignores rare spikes better than max.'"
+                         tooltipPosition="top">
+                        <span class="metric-label">p95</span>
+                        <span class="metric-value" [class.metric-value--warn]="(info.responseTimeP95 || 0) > 3000">{{ info.responseTimeP95 | number:'1.0-0' }} ms</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Reset Reason -->
         <div class="stat-card reset-card">
             <div class="card-header">

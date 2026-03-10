@@ -371,9 +371,29 @@
                             <span class="info-value">{{info.fallbackStratumUser | truncateMiddle:10:8}}</span>
                         </div>
                     </ng-container>
-                    <div class="info-item" *ngIf="info.responseTime && info.responseTime > 0">
-                        <span class="info-label">Response</span>
+                    <div class="info-item" *ngIf="info.responseTime && info.responseTime > 0"
+                         [pTooltip]="'EMA (smoothed) pool response time'"
+                         tooltipPosition="top">
+                        <span class="info-label">Response (EMA)</span>
                         <span class="info-value">{{info.responseTime | number:'1.0-0'}} ms</span>
+                    </div>
+                    <div class="info-item" *ngIf="info.responseTimeMin && info.responseTimeMin > 0"
+                         [pTooltip]="'Fastest pool response this session'"
+                         tooltipPosition="top">
+                        <span class="info-label">Response min</span>
+                        <span class="info-value">{{info.responseTimeMin | number:'1.0-0'}} ms</span>
+                    </div>
+                    <div class="info-item" *ngIf="info.responseTimeMax && info.responseTimeMax > 0"
+                         [pTooltip]="'Slowest pool response this session'"
+                         tooltipPosition="top">
+                        <span class="info-label">Response max</span>
+                        <span class="info-value">{{info.responseTimeMax | number:'1.0-0'}} ms</span>
+                    </div>
+                    <div class="info-item" *ngIf="info.responseTimeP95 && info.responseTimeP95 > 0"
+                         [pTooltip]="'95th percentile — 95% of shares were acknowledged within this time'"
+                         tooltipPosition="top">
+                        <span class="info-label">Response p95</span>
+                        <span class="info-value">{{info.responseTimeP95 | number:'1.0-0'}} ms</span>
                     </div>
                     <div class="info-item" *ngIf="info.fallbackStratumURL">
                         <span class="info-label">Switch</span>
@@ -424,7 +444,7 @@
                     </thead>
                     <tbody>
                         <tr *ngFor="let asic of info.hashrateMonitor!.asics; let i = index"
-                            [pTooltip]="(getAsicsAmount(info) > 1 ? 'ASIC ' + (i + 1) + ' — ' : '') + 'Errors: ' + asic.errorCount"
+                            [pTooltip]="(getAsicsAmount(info) > 1 ? 'ASIC ' + (i + 1) + ' — ' : '') + 'Errors: ' + asic.errorCount + (asic.errorRate != null ? ' (' + (asic.errorRate | number:'1.1-1') + '%)' : '')"
                             tooltipPosition="bottom">
                             <td *ngIf="getAsicsAmount(info) > 1" class="heatmap-asic-label">{{ i + 1 }}</td>
                             <td *ngFor="let domain of asic.domains"
