@@ -194,11 +194,6 @@ static esp_err_t is_network_allowed(httpd_req_t * req)
     if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) == ESP_OK) {
         ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
         origin_ip_addr = extract_origin_ip_addr(origin);
-        if (origin_ip_addr == 0) {
-            // Origin is non-IP (capacitor://, ionic://, null, hostname, https://) — fall back to request IP
-            ESP_LOGD(CORS_TAG, "Non-IP origin, using request IP for check");
-            origin_ip_addr = request_ip_addr;
-        }
     } else {
         ESP_LOGD(CORS_TAG, "No origin header found.");
         origin_ip_addr = request_ip_addr;
@@ -774,7 +769,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fan2rpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm[1]);
     cJSON_AddNumberToObject(root, "fanTargetTemp", nvs_config_get_u16(NVS_CONFIG_FAN_TARGET_TEMP, 45));
     cJSON_AddNumberToObject(root, "fanMinSpeed", nvs_config_get_u16(NVS_CONFIG_FAN_MIN_SPEED, 35));
-    cJSON_AddBoolToObject(root, "blockFound", GLOBAL_STATE->SYSTEM_MODULE.FOUND_BLOCK);
+    cJSON_AddNumberToObject(root, "blockFound", GLOBAL_STATE->SYSTEM_MODULE.FOUND_BLOCK);
     
     cJSON_AddNumberToObject(root, "chiptemp1", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp[0]);
     cJSON_AddNumberToObject(root, "chiptemp2", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp[1]);
