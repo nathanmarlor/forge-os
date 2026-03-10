@@ -93,6 +93,8 @@ typedef struct
     uint8_t response_time_sample_count;
     int64_t share_submit_timestamp_us;
     uint16_t overheat_mode;
+    float cpu0_percent;
+    float cpu1_percent;
     uint16_t power_fault;
     uint32_t lastClockSync;
     bool is_screen_active;

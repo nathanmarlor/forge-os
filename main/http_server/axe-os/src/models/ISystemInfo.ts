@@ -101,4 +101,7 @@ export interface ISystemInfo {
     },
 
     resetReason?: string,
+
+    cpu0Percent?: number,
+    cpu1Percent?: number,
 }
