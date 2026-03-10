@@ -410,13 +410,27 @@ void stratum_task(void * pvParameters)
             } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
                 if (GLOBAL_STATE->SYSTEM_MODULE.share_submit_timestamp_us > 0) {
                     float rtt = (esp_timer_get_time() - GLOBAL_STATE->SYSTEM_MODULE.share_submit_timestamp_us) / 1000.0f;
+                    SystemModule *sm = &GLOBAL_STATE->SYSTEM_MODULE;
                     // Exponential moving average (alpha=0.1) to smooth response time
-                    if (GLOBAL_STATE->SYSTEM_MODULE.response_time <= 0.0f) {
-                        GLOBAL_STATE->SYSTEM_MODULE.response_time = rtt;
+                    if (sm->response_time <= 0.0f) {
+                        sm->response_time = rtt;
                     } else {
-                        GLOBAL_STATE->SYSTEM_MODULE.response_time = 0.9f * GLOBAL_STATE->SYSTEM_MODULE.response_time + 0.1f * rtt;
+                        sm->response_time = 0.9f * sm->response_time + 0.1f * rtt;
                     }
-                    GLOBAL_STATE->SYSTEM_MODULE.share_submit_timestamp_us = 0;
+                    // Session min/max
+                    if (sm->response_time_min <= 0.0f || rtt < sm->response_time_min) {
+                        sm->response_time_min = rtt;
+                    }
+                    if (rtt > sm->response_time_max) {
+                        sm->response_time_max = rtt;
+                    }
+                    // Circular sample buffer for p95 computation
+                    sm->response_time_samples[sm->response_time_sample_idx] = rtt;
+                    sm->response_time_sample_idx = (sm->response_time_sample_idx + 1) % 100;
+                    if (sm->response_time_sample_count < 100) {
+                        sm->response_time_sample_count++;
+                    }
+                    sm->share_submit_timestamp_us = 0;
                 }
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "message result accepted");

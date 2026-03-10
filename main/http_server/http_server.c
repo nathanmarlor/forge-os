@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
 
@@ -41,6 +42,13 @@
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
+
+static int compare_float_asc(const void *a, const void *b)
+{
+    float fa = *(const float *)a;
+    float fb = *(const float *)b;
+    return (fa > fb) - (fa < fb);
+}
 
 /* Handler for WiFi scan endpoint */
 static esp_err_t GET_wifi_scan(httpd_req_t *req)
@@ -701,6 +709,19 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "isUsingFallbackStratum", GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback);
     cJSON_AddNumberToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
+    if (GLOBAL_STATE->SYSTEM_MODULE.response_time_min > 0) {
+        cJSON_AddNumberToObject(root, "responseTimeMin", GLOBAL_STATE->SYSTEM_MODULE.response_time_min);
+        cJSON_AddNumberToObject(root, "responseTimeMax", GLOBAL_STATE->SYSTEM_MODULE.response_time_max);
+    }
+    uint8_t rtt_count = GLOBAL_STATE->SYSTEM_MODULE.response_time_sample_count;
+    if (rtt_count >= 2) {
+        float rtt_samples[100];
+        memcpy(rtt_samples, GLOBAL_STATE->SYSTEM_MODULE.response_time_samples, rtt_count * sizeof(float));
+        qsort(rtt_samples, rtt_count, sizeof(float), compare_float_asc);
+        int p95_idx = (int)(rtt_count * 0.95f);
+        if (p95_idx >= rtt_count) p95_idx = rtt_count - 1;
+        cJSON_AddNumberToObject(root, "responseTimeP95", rtt_samples[p95_idx]);
+    }
     cJSON_AddNumberToObject(root, "statsFrequency", nvs_config_get_u16(NVS_CONFIG_STATS_FREQUENCY, 0));
 
     cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
@@ -815,6 +836,11 @@ static esp_err_t GET_system_info(httpd_req_t * req)
             }
             cJSON_AddItemToObject(asic, "domains", domains_array);
             cJSON_AddNumberToObject(asic, "errorCount", HRM->error_measurement[asic_nr].value);
+            float asic_error_rate = 0.0f;
+            if (HRM->total_measurement[asic_nr].hashrate > 0) {
+                asic_error_rate = HRM->error_measurement[asic_nr].hashrate / HRM->total_measurement[asic_nr].hashrate * 100.0f;
+            }
+            cJSON_AddNumberToObject(asic, "errorRate", asic_error_rate);
         }
     }
 

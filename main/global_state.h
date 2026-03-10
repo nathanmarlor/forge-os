@@ -86,6 +86,11 @@ typedef struct
     bool fallback_pool_decode_coinbase;
     bool is_using_fallback;
     float response_time;
+    float response_time_min;
+    float response_time_max;
+    float response_time_samples[100];
+    uint8_t response_time_sample_idx;
+    uint8_t response_time_sample_count;
     int64_t share_submit_timestamp_us;
     uint16_t overheat_mode;
     uint16_t power_fault;
