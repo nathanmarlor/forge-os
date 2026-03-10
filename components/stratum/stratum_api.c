@@ -291,6 +291,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         cJSON * p0 = params ? cJSON_GetArrayItem(params, 0) : NULL;
         if (p0 == NULL) {
             ESP_LOGE(TAG, "MINING_SET_DIFFICULTY: missing params");
+            message->method = STRATUM_UNKNOWN;
             goto done;
         }
         message->new_difficulty = p0->valueint;
@@ -299,6 +300,7 @@ void STRATUM_V1_parse(StratumApiV1Message * message, const char * stratum_json)
         cJSON * p0 = params ? cJSON_GetArrayItem(params, 0) : NULL;
         if (p0 == NULL) {
             ESP_LOGE(TAG, "MINING_SET_VERSION_MASK: missing params");
+            message->method = STRATUM_UNKNOWN;
             goto done;
         }
         message->version_mask = strtoul(p0->valuestring, NULL, 16);
