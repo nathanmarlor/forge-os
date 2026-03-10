@@ -12,6 +12,7 @@ import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { EditComponent } from './components/edit/edit.component';
 import { PoolComponent } from './components/pool/pool.component';
+import { EspHealthComponent } from './components/esp-health/esp-health.component';
 import { NetworkEditComponent } from './components/network-edit/network.edit.component';
 import { HomeComponent } from './components/home/home.component';
 import { LoadingComponent } from './components/loading/loading.component';
@@ -42,7 +43,8 @@ const components = [
   NetworkComponent,
   SettingsComponent,
   LogsComponent,
-  PoolComponent
+  PoolComponent,
+  EspHealthComponent
 ];
 
 @NgModule({

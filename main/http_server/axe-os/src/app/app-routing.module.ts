@@ -7,6 +7,7 @@ import { SettingsComponent } from './components/settings/settings.component';
 import { NetworkComponent } from './components/network/network.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
 import { PoolComponent } from './components/pool/pool.component';
+import { EspHealthComponent } from './components/esp-health/esp-health.component';
 import { AppLayoutComponent } from './layout/app.layout.component';
 import { ApModeGuard } from './guards/ap-mode.guard';
 
@@ -49,6 +50,10 @@ const routes: Routes = [
       {
         path: 'pool',
         component: PoolComponent
+      },
+      {
+        path: 'esp-health',
+        component: EspHealthComponent
       }
     ]
   },

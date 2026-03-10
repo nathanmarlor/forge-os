@@ -66,16 +66,6 @@
   &:last-child { border-bottom: none; }
 }
 
-.esp-metric { margin-bottom: 1rem; &:last-of-type { margin-bottom: 0; } }
-.esp-metric-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
-.esp-metric-label { color: var(--text-secondary); font-size: 0.875rem; }
-.esp-metric-value { color: var(--text-primary); font-size: 0.8rem; font-weight: 500; }
-.esp-metric-sub {
-  display: flex; justify-content: space-between; margin-top: 0.35rem;
-  span { color: var(--text-muted); font-size: 0.72rem; cursor: default; border-bottom: 1px dotted var(--text-muted); }
-}
-.esp-info-row { display: flex; gap: 1.25rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--card-border); flex-wrap: wrap; }
-.esp-info-item { display: flex; align-items: center; gap: 0.35rem; color: var(--text-muted); font-size: 0.8rem; i { font-size: 0.8rem; } }
 
 .info-label { color: var(--text-secondary); font-size: 0.875rem; flex-shrink: 0; }
 .info-value { color: var(--text-primary); font-weight: 500; text-align: right; }
