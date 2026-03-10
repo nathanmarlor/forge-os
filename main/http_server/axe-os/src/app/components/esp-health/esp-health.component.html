@@ -1,0 +1,168 @@
+<ng-template #loading>
+    <div class="flex align-items-center justify-content-center" style="min-height: 200px;">
+        <div class="text-center">
+            <i class="pi pi-spin pi-spinner text-4xl text-primary mb-3"></i>
+            <h4 class="text-500">Loading...</h4>
+        </div>
+    </div>
+</ng-template>
+
+<ng-container *ngIf="info$ | async as info; else loading">
+
+    <!-- Memory Chart -->
+    <div class="chart-section">
+        <div class="chart-card">
+            <div class="chart-header">
+                <i class="pi pi-chart-line chart-icon"></i>
+                <span class="chart-title">Memory Usage Over Time</span>
+                <span class="chart-subtitle">Last 60 minutes · 5-second interval</span>
+            </div>
+            <div class="chart-content">
+                <p-chart [data]="chartData" [options]="chartOptions"></p-chart>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+
+        <!-- Internal Heap -->
+        <div class="stat-card heap-card">
+            <div class="card-header">
+                <i class="pi pi-server card-icon heap-icon"></i>
+                <span class="card-title">Internal Heap</span>
+            </div>
+            <div class="card-content">
+                <div class="bar-row">
+                    <div class="bar-label">
+                        <span>Free</span>
+                        <span class="bar-value">{{ formatBytes(info.freeHeapInternal) }} / {{ formatBytes(info.totalHeapInternal || 0) }}</span>
+                    </div>
+                    <p-progressBar
+                        [value]="(info.freeHeapInternal / (info.totalHeapInternal || 1)) * 100"
+                        styleClass="custom-progress heap-bar">
+                        <ng-template pTemplate="content"></ng-template>
+                    </p-progressBar>
+                </div>
+
+                <div class="metric-rows">
+                    <div class="metric-row"
+                         *ngIf="info.minFreeHeap != null"
+                         [pTooltip]="'Lowest free heap since boot. If this shrinks across restarts, a memory leak is likely.'"
+                         tooltipPosition="top">
+                        <span class="metric-label">Low watermark</span>
+                        <span class="metric-value" [class.metric-value--warn]="info.minFreeHeap < 30000">
+                            {{ formatBytes(info.minFreeHeap) }}
+                        </span>
+                    </div>
+                    <div class="metric-row"
+                         *ngIf="info.largestFreeBlock != null"
+                         [pTooltip]="'Largest contiguous free block. Much smaller than free heap indicates fragmentation.'"
+                         tooltipPosition="top">
+                        <span class="metric-label">Largest block</span>
+                        <span class="metric-value">{{ formatBytes(info.largestFreeBlock) }}</span>
+                    </div>
+                    <div class="metric-row"
+                         *ngIf="info.largestFreeBlock != null"
+                         [pTooltip]="'Estimated fragmentation. High % means large allocations may fail even with free memory available.'"
+                         tooltipPosition="top">
+                        <span class="metric-label">Fragmentation</span>
+                        <span class="metric-value"
+                              [class.metric-value--warn]="getFragmentation(info.freeHeapInternal, info.largestFreeBlock) > 40">
+                            {{ getFragmentation(info.freeHeapInternal, info.largestFreeBlock) | number:'1.0-0' }}%
+                        </span>
+                    </div>
+                </div>
+
+                <div class="stat-warning" *ngIf="info.minFreeHeap != null && info.minFreeHeap < 20000">
+                    ⚠️ Low heap watermark — possible memory leak
+                </div>
+            </div>
+        </div>
+
+        <!-- PSRAM -->
+        <div class="stat-card psram-card" *ngIf="info.isPSRAMAvailable">
+            <div class="card-header">
+                <i class="pi pi-database card-icon psram-icon"></i>
+                <span class="card-title">PSRAM</span>
+            </div>
+            <div class="card-content">
+                <div class="bar-row">
+                    <div class="bar-label">
+                        <span>Free</span>
+                        <span class="bar-value">{{ formatBytes(info.freeHeapSpiram) }} / {{ formatBytes(info.totalHeapSpiram || 0) }}</span>
+                    </div>
+                    <p-progressBar
+                        [value]="(info.freeHeapSpiram / (info.totalHeapSpiram || 1)) * 100"
+                        styleClass="custom-progress psram-bar">
+                        <ng-template pTemplate="content"></ng-template>
+                    </p-progressBar>
+                </div>
+                <div class="psram-badge">
+                    <i class="pi pi-check-circle"></i>
+                    <span>SPIRAM available and mapped</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Info -->
+        <div class="stat-card system-card">
+            <div class="card-header">
+                <i class="pi pi-microchip card-icon"></i>
+                <span class="card-title">System Info</span>
+            </div>
+            <div class="card-content">
+                <div class="info-row">
+                    <span class="info-label">IDF Version</span>
+                    <span class="info-value">{{ info.idfVersion }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Firmware</span>
+                    <span class="info-value">{{ info.version }}</span>
+                </div>
+                <div class="info-row" *ngIf="info.taskCount">
+                    <span class="info-label">FreeRTOS Tasks</span>
+                    <span class="info-value">{{ info.taskCount }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Hostname</span>
+                    <span class="info-value">{{ info.hostname }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">MAC Address</span>
+                    <span class="info-value mono">{{ info.macAddr }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Uptime</span>
+                    <span class="info-value">{{ info.uptimeSeconds | dateAgo }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reset Reason -->
+        <div class="stat-card reset-card">
+            <div class="card-header">
+                <i class="pi pi-history card-icon"></i>
+                <span class="card-title">Last Reset</span>
+            </div>
+            <div class="card-content">
+                <div class="reset-badge" [ngClass]="getResetReasonClass(info.resetReason)">
+                    <i class="pi pi-refresh"></i>
+                    <span>{{ info.resetReason || 'Unknown' }}</span>
+                </div>
+                <p class="reset-description">{{ getResetReasonDescription(info.resetReason) }}</p>
+
+                <div class="reset-note" *ngIf="info.resetReason === 'Crash / Panic'">
+                    <i class="pi pi-exclamation-triangle"></i>
+                    <span>Tip: enable serial logging to capture the panic stack trace at the moment of crash.</span>
+                </div>
+                <div class="reset-note" *ngIf="info.resetReason === 'Task Watchdog (hung task)'">
+                    <i class="pi pi-exclamation-triangle"></i>
+                    <span>Tip: the I2C bus uses an infinite timeout by default — a stuck I2C device can cause this.</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</ng-container>
