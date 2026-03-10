@@ -354,6 +354,7 @@ void stratum_task(void * pvParameters)
         GLOBAL_STATE->abandon_work = 0;
 
         while (1) {
+            taskYIELD(); // allow IDLE task to reset watchdog when recv() is not blocking
             char * line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->sock);
             if (!line) {
                 ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
@@ -382,10 +383,6 @@ void stratum_task(void * pvParameters)
             } else if (stratum_api_v1_message.method == MINING_SET_DIFFICULTY) {
                 uint32_t new_diff = stratum_api_v1_message.new_difficulty;
                 if (new_diff > 0) {
-                    if (new_diff < suggested_difficulty) {
-                        ESP_LOGW(TAG, "Pool difficulty %lu below suggested %u, clamping", new_diff, suggested_difficulty);
-                        new_diff = suggested_difficulty;
-                    }
                     if (new_diff != SYSTEM_TASK_MODULE.stratum_difficulty) {
                         SYSTEM_TASK_MODULE.stratum_difficulty = new_diff;
                         ESP_LOGI(TAG, "Set stratum difficulty: %lu", SYSTEM_TASK_MODULE.stratum_difficulty);
