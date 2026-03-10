@@ -12,6 +12,7 @@
 #include "asic_task.h"
 #include "create_jobs_task.h"
 #include "hashrate_monitor_task.h"
+#include "cpu_monitor_task.h"
 #include "esp_netif.h"
 #include "system.h"
 #include "http_server.h"
@@ -201,6 +202,7 @@ void app_main(void)
     xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
     xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
     xTaskCreate(hashrate_monitor_task, "hashrate monitor", 4096, (void *) &GLOBAL_STATE, 5, NULL);
+    xTaskCreate(cpu_monitor_task, "cpu monitor", 4096, (void *) &GLOBAL_STATE, 2, NULL);
 }
 
 void MINER_set_wifi_status(wifi_status_t status, int retry_count, int reason)
