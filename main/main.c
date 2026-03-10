@@ -178,7 +178,7 @@ void app_main(void)
     ESP_LOGI(TAG, "AP remains active for dual-mode operation");
 
     // Create task to turn off AP after 7 minutes if WiFi is connected
-    xTaskCreate(&ap_timeout_task, "ap_timeout", 2048, (void *) &GLOBAL_STATE, 1, NULL);
+    xTaskCreate(&ap_timeout_task, "ap_timeout", 4096, (void *) &GLOBAL_STATE, 1, NULL);
 
     queue_init(&GLOBAL_STATE.stratum_queue);
     queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
