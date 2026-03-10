@@ -4,6 +4,10 @@
 #include "esp_log.h"
 #include "global_state.h"
 
+#if !defined(configUSE_TRACE_FACILITY) || (configUSE_TRACE_FACILITY != 1)
+#error "cpu_monitor_task requires CONFIG_FREERTOS_USE_TRACE_FACILITY=y in sdkconfig"
+#endif
+
 #define CPU_MONITOR_POLL_MS   5000
 #define CPU_MONITOR_MAX_TASKS 32
 
