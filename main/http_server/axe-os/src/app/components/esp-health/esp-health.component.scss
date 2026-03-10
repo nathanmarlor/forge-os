@@ -103,12 +103,24 @@
   .mono { font-family: monospace; font-size: 0.8rem; }
 }
 
+// Section subtitle label (used inside cards to split content areas)
+.section-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
 // CPU section (inside System card)
 .cpu-section {
   margin-top: 1rem;
   padding-top: 0.75rem;
   border-top: 1px solid var(--card-border);
   .bar-row { margin-bottom: 0.5rem; &:last-child { margin-bottom: 0; } }
+  .metric-rows { margin-bottom: 0; }
 }
 
 // Reset badge
