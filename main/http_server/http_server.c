@@ -194,6 +194,11 @@ static esp_err_t is_network_allowed(httpd_req_t * req)
     if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) == ESP_OK) {
         ESP_LOGD(CORS_TAG, "Origin header: %s", origin);
         origin_ip_addr = extract_origin_ip_addr(origin);
+        if (origin_ip_addr == 0) {
+            // Origin is non-IP (capacitor://, ionic://, null, hostname, https://) — fall back to request IP
+            ESP_LOGD(CORS_TAG, "Non-IP origin, using request IP for check");
+            origin_ip_addr = request_ip_addr;
+        }
     } else {
         ESP_LOGD(CORS_TAG, "No origin header found.");
         origin_ip_addr = request_ip_addr;
