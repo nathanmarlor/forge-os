@@ -27,14 +27,14 @@
 .chart-card {
   @extend %base-card;
   .chart-header {
-    display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;
-    .chart-icon { color: var(--heap-color); font-size: 1.2rem; }
+    display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap;
+    .chart-icon { color: var(--heap-color); font-size: 1.2rem; flex-shrink: 0; }
     .chart-title { font-size: 1.25rem; font-weight: 600; color: var(--text-primary); }
-    .chart-subtitle { color: var(--text-muted); font-size: 0.8rem; margin-left: auto; }
+    .chart-subtitle { color: var(--text-muted); font-size: 0.8rem; margin-left: auto; white-space: nowrap; }
   }
   .chart-content {
-    height: 280px;
-    ::ng-deep .p-chart { background: transparent !important; canvas { border-radius: 12px; } }
+    height: 280px; overflow: hidden; width: 100%;
+    ::ng-deep .p-chart { background: transparent !important; display: block; width: 100% !important; canvas { border-radius: 12px; width: 100% !important; } }
   }
 }
 
@@ -133,12 +133,14 @@
   :host { padding-top: 1rem; }
   .stats-grid { grid-template-columns: 1fr; gap: 1rem; }
   .stat-card { padding: 1rem; }
-  .chart-card .chart-content { height: 220px; }
+  .chart-card .chart-content { height: 200px; }
   .chart-card .chart-header .chart-subtitle { display: none; }
+  .chart-card .chart-header .chart-title { font-size: 1.1rem; }
 }
 
 @media (max-width: 480px) {
   :host { padding-top: 0.5rem; }
   .stats-grid { gap: 0.75rem; }
-  .stat-card { padding: 0.75rem; }
+  .stat-card, .chart-card { padding: 0.75rem; }
+  .chart-card .chart-content { height: 160px; }
 }

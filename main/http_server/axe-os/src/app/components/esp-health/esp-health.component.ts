@@ -60,15 +60,16 @@ export class EspHealthComponent {
 
     this.chartOptions = {
       animation: false,
+      responsive: true,
       maintainAspectRatio: false,
       interaction: { intersect: false, mode: 'index' },
       plugins: {
         legend: {
           labels: {
             color: textColor,
-            font: { size: 14, weight: 500 },
+            font: { size: 12, weight: 500 },
             usePointStyle: true,
-            padding: 20,
+            padding: 12,
           },
         },
         tooltip: {
@@ -87,7 +88,7 @@ export class EspHealthComponent {
         x: {
           type: 'time',
           time: { unit: 'hour' },
-          ticks: { color: textColorSecondary, font: { size: 12 } },
+          ticks: { color: textColorSecondary, font: { size: 11 }, maxTicksLimit: 6, maxRotation: 0 },
           grid: { color: surfaceBorder, drawBorder: false },
         },
         y: {
