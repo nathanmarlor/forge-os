@@ -372,28 +372,14 @@
                         </div>
                     </ng-container>
                     <div class="info-item" *ngIf="info.responseTime && info.responseTime > 0"
-                         [pTooltip]="'EMA (smoothed) pool response time'"
+                         [pTooltip]="getLatencyTooltip(info)"
+                         [escape]="false"
                          tooltipPosition="top">
-                        <span class="info-label">Response (EMA)</span>
+                        <span class="info-label">
+                            Response
+                            <i class="pi pi-info-circle" style="font-size:0.7rem; opacity:0.5; margin-left:3px"></i>
+                        </span>
                         <span class="info-value">{{info.responseTime | number:'1.0-0'}} ms</span>
-                    </div>
-                    <div class="info-item" *ngIf="info.responseTimeMin && info.responseTimeMin > 0"
-                         [pTooltip]="'Fastest pool response this session'"
-                         tooltipPosition="top">
-                        <span class="info-label">Response min</span>
-                        <span class="info-value">{{info.responseTimeMin | number:'1.0-0'}} ms</span>
-                    </div>
-                    <div class="info-item" *ngIf="info.responseTimeMax && info.responseTimeMax > 0"
-                         [pTooltip]="'Slowest pool response this session'"
-                         tooltipPosition="top">
-                        <span class="info-label">Response max</span>
-                        <span class="info-value">{{info.responseTimeMax | number:'1.0-0'}} ms</span>
-                    </div>
-                    <div class="info-item" *ngIf="info.responseTimeP95 && info.responseTimeP95 > 0"
-                         [pTooltip]="'95th percentile — 95% of shares were acknowledged within this time'"
-                         tooltipPosition="top">
-                        <span class="info-label">Response p95</span>
-                        <span class="info-value">{{info.responseTimeP95 | number:'1.0-0'}} ms</span>
                     </div>
                     <div class="info-item" *ngIf="info.fallbackStratumURL">
                         <span class="info-label">Switch</span>

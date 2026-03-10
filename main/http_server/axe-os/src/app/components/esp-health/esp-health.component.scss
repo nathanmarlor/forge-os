@@ -103,6 +103,14 @@
   .mono { font-family: monospace; font-size: 0.8rem; }
 }
 
+// CPU section (inside System card)
+.cpu-section {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--card-border);
+  .bar-row { margin-bottom: 0.5rem; &:last-child { margin-bottom: 0; } }
+}
+
 // Reset badge
 .reset-badge {
   display: inline-flex; align-items: center; gap: 0.5rem;
