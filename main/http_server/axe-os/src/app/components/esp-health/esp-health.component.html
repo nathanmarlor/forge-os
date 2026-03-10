@@ -92,6 +92,7 @@
                 <span class="card-title">System</span>
             </div>
             <div class="card-content">
+                <span class="section-label">Device</span>
                 <div class="info-row">
                     <span class="info-label">Firmware</span>
                     <span class="info-value">{{ info.version }}</span>
@@ -112,13 +113,14 @@
                     <span class="info-label">FreeRTOS Tasks</span>
                     <span class="info-value">{{ info.taskCount }}</span>
                 </div>
-                <div class="info-row">
+                <div class="info-row" style="border-bottom: none;">
                     <span class="info-label">Uptime</span>
                     <span class="info-value">{{ info.uptimeSeconds | dateAgo }}</span>
                 </div>
 
                 <ng-container *ngIf="info.cpu0Percent != null">
                     <div class="cpu-section">
+                        <span class="section-label">CPU Load</span>
                         <div class="bar-row">
                             <div class="bar-label">
                                 <span>Core 0</span>
@@ -164,21 +166,41 @@
                     <span>Tip: the I2C bus uses an infinite timeout by default — a stuck I2C device can cause this.</span>
                 </div>
 
-                <div class="metric-rows" *ngIf="info.responseTime && info.responseTime > 0" style="margin-top: 0.75rem;">
-                    <div class="metric-row"
-                         [pTooltip]="getLatencyTooltip(info)"
-                         [escape]="false"
-                         tooltipPosition="top">
-                        <span class="metric-label">
-                            <i class="pi pi-wifi" style="margin-right:4px; opacity:0.6"></i>
-                            Pool latency
-                            <i class="pi pi-info-circle" style="font-size:0.7rem; opacity:0.5; margin-left:3px"></i>
-                        </span>
-                        <span class="metric-value" [class.metric-value--warn]="(info.responseTimeMax || 0) > 5000">
-                            {{ info.responseTime | number:'1.0-0' }} ms
-                        </span>
+                <ng-container *ngIf="info.responseTime && info.responseTime > 0">
+                    <div class="cpu-section">
+                        <span class="section-label">Pool Latency</span>
+                        <div class="metric-rows">
+                            <div class="metric-row"
+                                 [pTooltip]="'Smoothed average response time (exponential moving average, α=0.1)'"
+                                 tooltipPosition="top">
+                                <span class="metric-label">Response</span>
+                                <span class="metric-value">{{ info.responseTime | number:'1.0-0' }} ms</span>
+                            </div>
+                            <div class="metric-row" *ngIf="info.responseTimeMin"
+                                 [pTooltip]="'Fastest pool acknowledgement this session'"
+                                 tooltipPosition="top">
+                                <span class="metric-label">Min</span>
+                                <span class="metric-value">{{ info.responseTimeMin | number:'1.0-0' }} ms</span>
+                            </div>
+                            <div class="metric-row" *ngIf="info.responseTimeP95"
+                                 [pTooltip]="'95th percentile — 95% of shares acknowledged within this time'"
+                                 tooltipPosition="top">
+                                <span class="metric-label">p95</span>
+                                <span class="metric-value" [class.metric-value--warn]="(info.responseTimeP95 || 0) > 3000">
+                                    {{ info.responseTimeP95 | number:'1.0-0' }} ms
+                                </span>
+                            </div>
+                            <div class="metric-row" *ngIf="info.responseTimeMax"
+                                 [pTooltip]="'Slowest pool acknowledgement this session'"
+                                 tooltipPosition="top">
+                                <span class="metric-label">Max</span>
+                                <span class="metric-value" [class.metric-value--warn]="(info.responseTimeMax || 0) > 5000">
+                                    {{ info.responseTimeMax | number:'1.0-0' }} ms
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                </ng-container>
             </div>
         </div>
 
