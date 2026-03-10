@@ -64,16 +64,11 @@ void cpu_monitor_task(void *pvParameters)
             }
         }
 
-        // total_delta is the sum across both cores; halve it for per-core baseline
-        uint32_t per_core_total = total_delta / 2;
-        if (per_core_total == 0) {
-            memcpy(prev_stats, curr_stats, task_count * sizeof(TaskStatus_t));
-            prev_total = curr_total;
-            continue;
-        }
-
-        float cpu0 = (1.0f - (float)idle0_delta / (float)per_core_total) * 100.0f;
-        float cpu1 = (1.0f - (float)idle1_delta / (float)per_core_total) * 100.0f;
+        // total_delta is wall-clock elapsed time in μs (portGET_RUN_TIME_COUNTER_VALUE
+        // uses esp_timer_get_time() — a single wall-clock value, not per-core).
+        // Each IDLE task accumulates up to total_delta μs of run time on its core.
+        float cpu0 = (1.0f - (float)idle0_delta / (float)total_delta) * 100.0f;
+        float cpu1 = (1.0f - (float)idle1_delta / (float)total_delta) * 100.0f;
 
         // Clamp to [0, 100]
         if (cpu0 < 0.0f)   cpu0 = 0.0f;
