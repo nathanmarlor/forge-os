@@ -26,21 +26,33 @@
     <!-- Stats Grid -->
     <div class="stats-grid">
 
-        <!-- Internal Heap -->
+        <!-- Memory: Internal Heap + PSRAM -->
         <div class="stat-card heap-card">
             <div class="card-header">
                 <i class="pi pi-server card-icon heap-icon"></i>
-                <span class="card-title">Internal Heap</span>
+                <span class="card-title">Memory</span>
             </div>
             <div class="card-content">
                 <div class="bar-row">
                     <div class="bar-label">
-                        <span>Free</span>
+                        <span>Heap free</span>
                         <span class="bar-value">{{ formatBytes(info.freeHeapInternal) }} / {{ formatBytes(info.totalHeapInternal || 0) }}</span>
                     </div>
                     <p-progressBar
                         [value]="(info.freeHeapInternal / (info.totalHeapInternal || 1)) * 100"
                         styleClass="custom-progress heap-bar">
+                        <ng-template pTemplate="content"></ng-template>
+                    </p-progressBar>
+                </div>
+
+                <div class="bar-row" *ngIf="info.isPSRAMAvailable">
+                    <div class="bar-label">
+                        <span>PSRAM free</span>
+                        <span class="bar-value">{{ formatBytes(info.freeHeapSpiram) }} / {{ formatBytes(info.totalHeapSpiram || 0) }}</span>
+                    </div>
+                    <p-progressBar
+                        [value]="(info.freeHeapSpiram / (info.totalHeapSpiram || 1)) * 100"
+                        styleClass="custom-progress psram-bar">
                         <ng-template pTemplate="content"></ng-template>
                     </p-progressBar>
                 </div>
@@ -54,13 +66,6 @@
                         <span class="metric-value" [class.metric-value--warn]="info.minFreeHeap < 30000">
                             {{ formatBytes(info.minFreeHeap) }}
                         </span>
-                    </div>
-                    <div class="metric-row"
-                         *ngIf="info.largestFreeBlock != null"
-                         [pTooltip]="'Largest contiguous free block. Much smaller than free heap indicates fragmentation.'"
-                         tooltipPosition="top">
-                        <span class="metric-label">Largest block</span>
-                        <span class="metric-value">{{ formatBytes(info.largestFreeBlock) }}</span>
                     </div>
                     <div class="metric-row"
                          *ngIf="info.largestFreeBlock != null"
@@ -80,77 +85,20 @@
             </div>
         </div>
 
-        <!-- PSRAM -->
-        <div class="stat-card psram-card" *ngIf="info.isPSRAMAvailable">
-            <div class="card-header">
-                <i class="pi pi-database card-icon psram-icon"></i>
-                <span class="card-title">PSRAM</span>
-            </div>
-            <div class="card-content">
-                <div class="bar-row">
-                    <div class="bar-label">
-                        <span>Free</span>
-                        <span class="bar-value">{{ formatBytes(info.freeHeapSpiram) }} / {{ formatBytes(info.totalHeapSpiram || 0) }}</span>
-                    </div>
-                    <p-progressBar
-                        [value]="(info.freeHeapSpiram / (info.totalHeapSpiram || 1)) * 100"
-                        styleClass="custom-progress psram-bar">
-                        <ng-template pTemplate="content"></ng-template>
-                    </p-progressBar>
-                </div>
-                <div class="psram-badge">
-                    <i class="pi pi-check-circle"></i>
-                    <span>SPIRAM available and mapped</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- CPU Load -->
-        <div class="stat-card" *ngIf="info.cpu0Percent != null">
-            <div class="card-header">
-                <i class="pi pi-chart-bar card-icon"></i>
-                <span class="card-title">CPU Load</span>
-            </div>
-            <div class="card-content">
-                <div class="bar-row">
-                    <div class="bar-label">
-                        <span>Core 0</span>
-                        <span class="bar-value">{{ info.cpu0Percent | number:'1.0-1' }}%</span>
-                    </div>
-                    <p-progressBar [value]="info.cpu0Percent" styleClass="custom-progress">
-                        <ng-template pTemplate="content"></ng-template>
-                    </p-progressBar>
-                </div>
-                <div class="bar-row" style="margin-top: 0.75rem;">
-                    <div class="bar-label">
-                        <span>Core 1</span>
-                        <span class="bar-value">{{ info.cpu1Percent | number:'1.0-1' }}%</span>
-                    </div>
-                    <p-progressBar [value]="info.cpu1Percent" styleClass="custom-progress">
-                        <ng-template pTemplate="content"></ng-template>
-                    </p-progressBar>
-                </div>
-            </div>
-        </div>
-
-        <!-- System Info -->
+        <!-- System Info + CPU Load -->
         <div class="stat-card system-card">
             <div class="card-header">
                 <i class="pi pi-microchip card-icon"></i>
-                <span class="card-title">System Info</span>
+                <span class="card-title">System</span>
             </div>
             <div class="card-content">
-                <div class="info-row">
-                    <span class="info-label">IDF Version</span>
-                    <span class="info-value">{{ info.idfVersion }}</span>
-                </div>
                 <div class="info-row">
                     <span class="info-label">Firmware</span>
                     <span class="info-value">{{ info.version }}</span>
                 </div>
-                <div class="info-row" *ngIf="info.taskCount">
-                    <span class="info-label">FreeRTOS Tasks</span>
-                    <span class="info-value">{{ info.taskCount }}</span>
+                <div class="info-row">
+                    <span class="info-label">IDF Version</span>
+                    <span class="info-value">{{ info.idfVersion }}</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Hostname</span>
@@ -160,54 +108,45 @@
                     <span class="info-label">MAC Address</span>
                     <span class="info-value mono">{{ info.macAddr }}</span>
                 </div>
+                <div class="info-row" *ngIf="info.taskCount">
+                    <span class="info-label">FreeRTOS Tasks</span>
+                    <span class="info-value">{{ info.taskCount }}</span>
+                </div>
                 <div class="info-row">
                     <span class="info-label">Uptime</span>
                     <span class="info-value">{{ info.uptimeSeconds | dateAgo }}</span>
                 </div>
+
+                <ng-container *ngIf="info.cpu0Percent != null">
+                    <div class="cpu-section">
+                        <div class="bar-row">
+                            <div class="bar-label">
+                                <span>Core 0</span>
+                                <span class="bar-value">{{ info.cpu0Percent | number:'1.0-1' }}%</span>
+                            </div>
+                            <p-progressBar [value]="info.cpu0Percent" styleClass="custom-progress">
+                                <ng-template pTemplate="content"></ng-template>
+                            </p-progressBar>
+                        </div>
+                        <div class="bar-row">
+                            <div class="bar-label">
+                                <span>Core 1</span>
+                                <span class="bar-value">{{ info.cpu1Percent | number:'1.0-1' }}%</span>
+                            </div>
+                            <p-progressBar [value]="info.cpu1Percent" styleClass="custom-progress">
+                                <ng-template pTemplate="content"></ng-template>
+                            </p-progressBar>
+                        </div>
+                    </div>
+                </ng-container>
             </div>
         </div>
 
-        <!-- Pool Latency -->
-        <div class="stat-card" *ngIf="info.responseTime && info.responseTime > 0">
-            <div class="card-header">
-                <i class="pi pi-wifi card-icon"></i>
-                <span class="card-title">Pool Latency</span>
-            </div>
-            <div class="card-content">
-                <div class="metric-rows">
-                    <div class="metric-row"
-                         [pTooltip]="'Smoothed average response time (exponential moving average, α=0.1)'"
-                         tooltipPosition="top">
-                        <span class="metric-label">EMA</span>
-                        <span class="metric-value">{{ info.responseTime | number:'1.0-0' }} ms</span>
-                    </div>
-                    <div class="metric-row" *ngIf="info.responseTimeMin"
-                         [pTooltip]="'Fastest pool acknowledgement this session'"
-                         tooltipPosition="top">
-                        <span class="metric-label">Min</span>
-                        <span class="metric-value">{{ info.responseTimeMin | number:'1.0-0' }} ms</span>
-                    </div>
-                    <div class="metric-row" *ngIf="info.responseTimeMax"
-                         [pTooltip]="'Slowest pool acknowledgement this session'"
-                         tooltipPosition="top">
-                        <span class="metric-label">Max</span>
-                        <span class="metric-value" [class.metric-value--warn]="(info.responseTimeMax || 0) > 5000">{{ info.responseTimeMax | number:'1.0-0' }} ms</span>
-                    </div>
-                    <div class="metric-row" *ngIf="info.responseTimeP95"
-                         [pTooltip]="'95th percentile — 95% of shares were acknowledged within this time. Ignores rare spikes better than max.'"
-                         tooltipPosition="top">
-                        <span class="metric-label">p95</span>
-                        <span class="metric-value" [class.metric-value--warn]="(info.responseTimeP95 || 0) > 3000">{{ info.responseTimeP95 | number:'1.0-0' }} ms</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Reset Reason -->
+        <!-- Status: Last Reset + Pool Latency -->
         <div class="stat-card reset-card">
             <div class="card-header">
                 <i class="pi pi-history card-icon"></i>
-                <span class="card-title">Last Reset</span>
+                <span class="card-title">Status</span>
             </div>
             <div class="card-content">
                 <div class="reset-badge" [ngClass]="getResetReasonClass(info.resetReason)">
@@ -223,6 +162,22 @@
                 <div class="reset-note" *ngIf="info.resetReason === 'Task Watchdog (hung task)'">
                     <i class="pi pi-exclamation-triangle"></i>
                     <span>Tip: the I2C bus uses an infinite timeout by default — a stuck I2C device can cause this.</span>
+                </div>
+
+                <div class="metric-rows" *ngIf="info.responseTime && info.responseTime > 0" style="margin-top: 0.75rem;">
+                    <div class="metric-row"
+                         [pTooltip]="getLatencyTooltip(info)"
+                         [escape]="false"
+                         tooltipPosition="top">
+                        <span class="metric-label">
+                            <i class="pi pi-wifi" style="margin-right:4px; opacity:0.6"></i>
+                            Pool latency
+                            <i class="pi pi-info-circle" style="font-size:0.7rem; opacity:0.5; margin-left:3px"></i>
+                        </span>
+                        <span class="metric-value" [class.metric-value--warn]="(info.responseTimeMax || 0) > 5000">
+                            {{ info.responseTime | number:'1.0-0' }} ms
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>

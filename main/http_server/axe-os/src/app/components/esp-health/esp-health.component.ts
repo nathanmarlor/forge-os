@@ -155,6 +155,15 @@ export class EspHealthComponent {
     return Math.max(0, 100 - (largestBlock / freeHeap) * 100)
   }
 
+  public getLatencyTooltip(info: ISystemInfo): string {
+    const parts: string[] = ['<div style="line-height:1.8;min-width:120px">']
+    if (info.responseTimeMin) parts.push(`<span style="opacity:.7">Min</span>&nbsp;&nbsp;<b>${Math.round(info.responseTimeMin)} ms</b><br>`)
+    if (info.responseTimeP95) parts.push(`<span style="opacity:.7">p95</span>&nbsp;&nbsp;<b>${Math.round(info.responseTimeP95)} ms</b><br>`)
+    if (info.responseTimeMax) parts.push(`<span style="opacity:.7">Max</span>&nbsp;&nbsp;<b>${Math.round(info.responseTimeMax)} ms</b>`)
+    parts.push('</div>')
+    return parts.join('')
+  }
+
   public getResetReasonClass(reason: string | undefined): string {
     if (!reason) return 'reason-normal'
     const r = reason.toLowerCase()
