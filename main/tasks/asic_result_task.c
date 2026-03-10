@@ -63,7 +63,26 @@ void ASIC_result_task(void *pvParameters)
         //log the ASIC response
         ESP_LOGD(TAG, "Ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %ld.", asic_result->rolled_version, asic_result->nonce, nonce_diff, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->pool_diff);
 
-        if (nonce_diff >= GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->pool_diff)
+        bool should_submit = (nonce_diff >= GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->pool_diff);
+
+        // Copy job data needed for submission before releasing the lock.
+        // The socket write can block (no SO_SNDTIMEO), so we must not hold the
+        // lock during it - otherwise ASIC_task is blocked from sending new work,
+        // causing results to queue up in the UART buffer and then burst.
+        char jobid_buf[64] = {0};
+        char extranonce2_buf[64] = {0};
+        uint32_t ntime = 0;
+        uint32_t job_version = 0;
+        if (should_submit) {
+            strncpy(jobid_buf, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->jobid, sizeof(jobid_buf) - 1);
+            strncpy(extranonce2_buf, GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->extranonce2, sizeof(extranonce2_buf) - 1);
+            ntime = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->ntime;
+            job_version = GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version;
+        }
+
+        pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+
+        if (should_submit)
         {
             char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
             GLOBAL_STATE->SYSTEM_MODULE.share_submit_timestamp_us = esp_timer_get_time();
@@ -71,20 +90,16 @@ void ASIC_result_task(void *pvParameters)
                 GLOBAL_STATE->sock,
                 GLOBAL_STATE->send_uid++,
                 user,
-                GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->jobid,
-                GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->extranonce2,
-                GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->ntime,
+                jobid_buf,
+                extranonce2_buf,
+                ntime,
                 asic_result->nonce,
-                asic_result->rolled_version ^ GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id]->version);
-
-            pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
+                asic_result->rolled_version ^ job_version);
 
             if (ret < 0) {
                 ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
                 stratum_close_connection(GLOBAL_STATE);
             }
-        } else {
-            pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
         }
 
         SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, job_id);
