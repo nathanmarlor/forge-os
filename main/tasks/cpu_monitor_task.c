@@ -20,8 +20,8 @@ void cpu_monitor_task(void *pvParameters)
     extern app_context_t APP_CONTEXT;
     stats_module_t *stats = &APP_CONTEXT.stats;
 
-    TaskStatus_t prev_stats[CPU_MONITOR_MAX_TASKS];
-    TaskStatus_t curr_stats[CPU_MONITOR_MAX_TASKS];
+    static TaskStatus_t prev_stats[CPU_MONITOR_MAX_TASKS];
+    static TaskStatus_t curr_stats[CPU_MONITOR_MAX_TASKS];
     uint32_t prev_total = 0;
     uint32_t curr_total = 0;
 
