@@ -24,14 +24,18 @@
 #include "nvs_device.h"
 #include "self_test.h"
 #include "asic.h"
+#include "app_context.h"
+#include "event_bus.h"
 
 static GlobalState GLOBAL_STATE = {
-    .extranonce_str = NULL, 
-    .extranonce_2_len = 0, 
-    .abandon_work = 0, 
+    .extranonce_str = NULL,
+    .extranonce_2_len = 0,
+    .abandon_work = 0,
     .version_mask = 0,
     .ASIC_initalized = false
 };
+
+static app_context_t APP_CONTEXT;
 
 static const char * TAG = "bitforge";
 
@@ -113,6 +117,13 @@ void app_main(void)
         ESP_LOGE(TAG, "Error setting ASIC model");
         return;
     }
+
+    // Initialize event bus and app context (Architecture V2)
+    if (event_bus_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init event bus");
+        return;
+    }
+    app_context_init_from_legacy(&APP_CONTEXT, &GLOBAL_STATE);
 
     // Optionally hold the boot button
     // bool pressed = gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed <--- Not suppoerted on Nano
