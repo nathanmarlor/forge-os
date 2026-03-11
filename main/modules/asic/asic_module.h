@@ -15,9 +15,9 @@ typedef struct {
     bm_job *active_jobs[ASIC_JOB_SLOTS];
     uint8_t valid_jobs[ASIC_JOB_SLOTS];
 
-    // Pointer to the jobs mutex. During migration, points into GlobalState.
-    // When GlobalState is removed, embed a pthread_mutex_t here instead.
-    pthread_mutex_t *jobs_lock;
+    // Mutex protecting active_jobs and valid_jobs
+    pthread_mutex_t jobs_mutex;
+    pthread_mutex_t *jobs_lock;  // Points to jobs_mutex (or GlobalState mutex during self_test bridge)
 
     // Dispatch timing
     SemaphoreHandle_t dispatch_semaphore;
@@ -31,14 +31,13 @@ typedef struct {
 
 /**
  * Initialize the ASIC module.
- * Creates semaphore, zeroes job arrays.
- * The jobs_lock pointer must be set separately via bridge_legacy.
+ * Creates semaphore, mutex, zeroes job arrays.
  */
 void asic_module_init(asic_module_t *module, double job_interval_ms, uint32_t asic_difficulty);
 
 /**
  * Wire legacy GlobalState pointers to alias the module's arrays.
- * Also sets the module's jobs_lock pointer to GlobalState's mutex.
+ * Used only by self_test.c during production testing.
  */
 void asic_module_bridge_legacy(asic_module_t *module, void *global_state);
 
