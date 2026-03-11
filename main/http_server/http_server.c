@@ -41,6 +41,7 @@
 #include "http_server.h"
 #include "stats.h"
 #include "power_module.h"
+#include "stratum_module.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -573,7 +574,9 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
     }
     if ((item = cJSON_GetObjectItem(root, "useFallbackStratum")) != NULL) {
         bool use_fallback = (bool)item->valueint;
-        GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = use_fallback;
+        extern app_context_t APP_CONTEXT;
+        APP_CONTEXT.stratum.is_using_fallback = use_fallback;
+        GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = use_fallback; // Legacy sync
         config_set_u16(config, NVS_CONFIG_USE_FALLBACK_STRATUM, use_fallback ? 1 : 0);
         if (GLOBAL_STATE->sock >= 0) {
             shutdown(GLOBAL_STATE->sock, SHUT_RDWR);
@@ -682,6 +685,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     config_module_t *config = &APP_CONTEXT.config;
     stats_module_t *stats = &APP_CONTEXT.stats;
     power_module_t *pwr = &APP_CONTEXT.power;
+    stratum_module_t *strat = &APP_CONTEXT.stratum;
 
     char * ssid = config_get_string(config, NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
     char * hostname = config_get_string(config, NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
@@ -716,18 +720,18 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "bestDiff", stats->best_nonce_diff);
     cJSON_AddStringToObject(root, "bestSessionDiff", stats->best_session_diff_string);
     cJSON_AddNumberToObject(root, "bestSessionDiffValue", stats->best_session_nonce_diff);
-    cJSON_AddNumberToObject(root, "stratumDiff", GLOBAL_STATE->stratum_difficulty);
+    cJSON_AddNumberToObject(root, "stratumDiff", strat->stratum_difficulty);
 
-    cJSON_AddNumberToObject(root, "isUsingFallbackStratum", GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback);
-    cJSON_AddNumberToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
-    if (GLOBAL_STATE->SYSTEM_MODULE.response_time_min > 0) {
-        cJSON_AddNumberToObject(root, "responseTimeMin", GLOBAL_STATE->SYSTEM_MODULE.response_time_min);
-        cJSON_AddNumberToObject(root, "responseTimeMax", GLOBAL_STATE->SYSTEM_MODULE.response_time_max);
+    cJSON_AddNumberToObject(root, "isUsingFallbackStratum", strat->is_using_fallback);
+    cJSON_AddNumberToObject(root, "responseTime", strat->rtt.ema);
+    if (strat->rtt.min > 0) {
+        cJSON_AddNumberToObject(root, "responseTimeMin", strat->rtt.min);
+        cJSON_AddNumberToObject(root, "responseTimeMax", strat->rtt.max);
     }
-    uint8_t rtt_count = GLOBAL_STATE->SYSTEM_MODULE.response_time_sample_count;
+    uint8_t rtt_count = strat->rtt.sample_count;
     if (rtt_count >= 2) {
-        float rtt_samples[100];
-        memcpy(rtt_samples, GLOBAL_STATE->SYSTEM_MODULE.response_time_samples, rtt_count * sizeof(float));
+        float rtt_samples[STRATUM_RTT_SAMPLE_COUNT];
+        memcpy(rtt_samples, strat->rtt.samples, rtt_count * sizeof(float));
         qsort(rtt_samples, rtt_count, sizeof(float), compare_float_asc);
         int p95_idx = (int)(rtt_count * 0.95f);
         if (p95_idx >= rtt_count) p95_idx = rtt_count - 1;
@@ -735,7 +739,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     }
     cJSON_AddNumberToObject(root, "statsFrequency", config_get_u16(config, NVS_CONFIG_STATS_FREQUENCY, 0));
 
-    cJSON_AddNumberToObject(root, "isPSRAMAvailable", GLOBAL_STATE->psram_is_available);
+    cJSON_AddNumberToObject(root, "isPSRAMAvailable", APP_CONTEXT.psram_available);
 
     cJSON_AddNumberToObject(root, "freeHeap", esp_get_free_heap_size());
     cJSON_AddNumberToObject(root, "freeHeapInternal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
@@ -771,7 +775,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - stats->start_time) / 1000000);
     cJSON_AddNumberToObject(root, "asicCount", ASIC_get_asic_count(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "smallCoreCount", ASIC_get_small_core_count(GLOBAL_STATE));
-    cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->asic_model_str);
+    cJSON_AddStringToObject(root, "ASICModel", APP_CONTEXT.asic_model_str);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
     cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
     cJSON_AddNumberToObject(root, "stratumPort", config_get_u16(config, NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT));
@@ -812,10 +816,10 @@ static esp_err_t GET_system_info(httpd_req_t * req)
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
     }
 
-    if (GLOBAL_STATE->block_height > 0) {
-        cJSON_AddNumberToObject(root, "blockHeight", GLOBAL_STATE->block_height);
-        cJSON_AddStringToObject(root, "scriptsig", GLOBAL_STATE->scriptsig);
-        cJSON_AddNumberToObject(root, "networkDifficulty", GLOBAL_STATE->network_nonce_diff);
+    if (strat->block_height > 0) {
+        cJSON_AddNumberToObject(root, "blockHeight", strat->block_height);
+        cJSON_AddStringToObject(root, "scriptsig", strat->scriptsig);
+        cJSON_AddNumberToObject(root, "networkDifficulty", strat->network_nonce_diff);
     }
 
     if (GLOBAL_STATE->coinbase_output_count > 0) {
@@ -893,8 +897,9 @@ static esp_err_t GET_system_asic(httpd_req_t * req)
 
     cJSON * root = cJSON_CreateObject();
 
-    cJSON_AddStringToObject(root, "ASICModel", GLOBAL_STATE->asic_model_str);
-    cJSON_AddStringToObject(root, "deviceModel", GLOBAL_STATE->device_model_str);
+    extern app_context_t APP_CONTEXT;
+    cJSON_AddStringToObject(root, "ASICModel", APP_CONTEXT.asic_model_str);
+    cJSON_AddStringToObject(root, "deviceModel", APP_CONTEXT.device_model_str);
     cJSON_AddNumberToObject(root, "asicCount", ASIC_get_asic_count(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "smallCoreCount", ASIC_get_small_core_count(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "defaultFrequency", CONFIG_ASIC_FREQUENCY);
