@@ -11,9 +11,10 @@ SRCS
 INCLUDE_DIRS 
     "include"
 
-REQUIRES 
+REQUIRES
     "freertos"
-    "driver"
+    "esp_driver_gpio"
+    "esp_driver_uart"
     "stratum"
 )
 

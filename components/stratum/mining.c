@@ -3,7 +3,8 @@
 #include <limits.h>
 #include "mining.h"
 #include "utils.h"
-#include "mbedtls/sha256.h"
+#include "tf-psa-crypto/build_info.h"
+#include "mbedtls/private/sha256.h"
 
 void free_bm_job(bm_job *job)
 {

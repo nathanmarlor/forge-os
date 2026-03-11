@@ -4,7 +4,10 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "mbedtls/sha256.h"
+// build_info.h must come first so esp_config.h defines MBEDTLS_ALLOW_PRIVATE_ACCESS
+// before private_access.h is parsed inside sha256.h
+#include "tf-psa-crypto/build_info.h"
+#include "mbedtls/private/sha256.h"
 
 #ifndef bswap_16
 #define bswap_16(a) ((((uint16_t)(a) << 8) & 0xff00) | (((uint16_t)(a) >> 8) & 0xff))
