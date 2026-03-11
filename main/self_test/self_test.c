@@ -128,9 +128,11 @@ static void reset_self_test() {
     xSemaphoreGive(BootSemaphore);
 }
 
-static void display_msg(char * msg, GlobalState * GLOBAL_STATE) 
+static void display_msg(char * msg, GlobalState * GLOBAL_STATE)
 {
     GLOBAL_STATE->SELF_TEST_MODULE.message = msg;
+    extern app_context_t APP_CONTEXT;
+    APP_CONTEXT.self_test.message = msg;
 }
 
 static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
@@ -311,6 +313,10 @@ void execute_production_test(void * pvParameters)
     }
 
     GLOBAL_STATE->SELF_TEST_MODULE.active = true;
+    {
+        extern app_context_t APP_CONTEXT;
+        APP_CONTEXT.self_test.active = true;
+    }
 
     // Create a binary semaphore
     BootSemaphore = xSemaphoreCreateBinary();
@@ -530,6 +536,11 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool test_result, TEST_FAILED
 
     GLOBAL_STATE->SELF_TEST_MODULE.result = test_result;
     GLOBAL_STATE->SELF_TEST_MODULE.finished = true;
+    {
+        extern app_context_t APP_CONTEXT;
+        APP_CONTEXT.self_test.result = test_result;
+        APP_CONTEXT.self_test.finished = true;
+    }
     Power_disable(GLOBAL_STATE->device_model);
 
     if (test_result == TESTS_FAILED) {

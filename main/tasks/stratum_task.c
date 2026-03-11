@@ -191,6 +191,7 @@ void stratum_primary_heartbeat(void * pvParameters)
 static void decode_mining_notification(stratum_module_t *strat,
                                        const mining_notify * notification)
 {
+    extern app_context_t APP_CONTEXT;
     if (!strat->extranonce_str) return;
 
     mining_notification_result_t result;
@@ -221,6 +222,14 @@ static void decode_mining_notification(stratum_module_t *strat,
             strat->scriptsig[sizeof(strat->scriptsig) - 1] = '\0';
         }
         free(result.scriptsig);
+    }
+
+    // Store coinbase data for HTTP API
+    if (result.decoding_enabled && result.output_count > 0) {
+        APP_CONTEXT.coinbase_output_count = result.output_count;
+        memcpy(APP_CONTEXT.coinbase_outputs, result.outputs,
+               sizeof(coinbase_output_t) * result.output_count);
+        APP_CONTEXT.coinbase_value_total_satoshis = result.total_value_satoshis;
     }
 }
 

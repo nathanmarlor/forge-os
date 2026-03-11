@@ -7,8 +7,6 @@
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE);
 esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE);
 
-void SYSTEM_notify_mining_started(GlobalState * GLOBAL_STATE);
-
 // LED control (1 = share LED, 2 = status LED)
 void SYSTEM_led_blink(int num);
 
