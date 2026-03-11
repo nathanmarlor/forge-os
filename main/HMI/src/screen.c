@@ -4,7 +4,7 @@
 #include "esp_check.h"
 #include "lvgl.h"
 #include "esp_lvgl_port.h"
-#include "global_state.h"
+#include "app_context.h"
 #include "screen.h"
 
 // static const char * TAG = "screen";
@@ -15,8 +15,6 @@ static lv_obj_t * screens[MAX_SCREENS];
 
 static screen_t current_screen = -1;
 static TickType_t current_screen_counter;
-
-static GlobalState * GLOBAL_STATE;
 
 static lv_obj_t *asic_status_label;
 
@@ -74,7 +72,7 @@ static lv_obj_t * create_scr_self_test() {
     return scr;
 }
 
-static lv_obj_t * create_scr_overheat(SystemModule * module) {
+static lv_obj_t * create_scr_overheat(wifi_state_t *wifi) {
     lv_obj_t * scr = lv_obj_create(NULL);
 
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
@@ -92,12 +90,12 @@ static lv_obj_t * create_scr_overheat(SystemModule * module) {
     lv_label_set_text(label3, "Device IP:");
 
     ip_addr_scr_overheat_label = lv_label_create(scr);
-    lv_label_set_text(ip_addr_scr_overheat_label, module->ip_addr_str);
+    lv_label_set_text(ip_addr_scr_overheat_label, wifi->ip_addr_str);
 
     return scr;
 }
 
-static lv_obj_t * create_scr_asic_status(SystemModule * module) {
+static lv_obj_t * create_scr_asic_status() {
     lv_obj_t * scr = lv_obj_create(NULL);
 
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
@@ -112,7 +110,7 @@ static lv_obj_t * create_scr_asic_status(SystemModule * module) {
     return scr;
 }
 
-static lv_obj_t * create_scr_configure(SystemModule * module) {
+static lv_obj_t * create_scr_configure(wifi_state_t *wifi) {
     lv_obj_t * scr = lv_obj_create(NULL);
 
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
@@ -131,12 +129,12 @@ static lv_obj_t * create_scr_configure(SystemModule * module) {
     lv_label_set_text(label2, "Wi-Fi (for setup):");
 
     lv_obj_t *label3 = lv_label_create(scr);
-    lv_label_set_text(label3, module->ap_ssid);
+    lv_label_set_text(label3, wifi->ap_ssid);
 
     return scr;
 }
 
-static lv_obj_t * create_scr_ota(SystemModule * module) {
+static lv_obj_t * create_scr_ota() {
     lv_obj_t * scr = lv_obj_create(NULL);
 
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
@@ -153,25 +151,25 @@ static lv_obj_t * create_scr_ota(SystemModule * module) {
     return scr;
 }
 
-static lv_obj_t * create_scr_connection(SystemModule * module) {
+static lv_obj_t * create_scr_connection(wifi_state_t *wifi) {
     lv_obj_t * scr = lv_obj_create(NULL);
 
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(scr, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
     lv_obj_t *label1 = lv_label_create(scr);
-    lv_obj_set_width(label1, LV_HOR_RES);    
+    lv_obj_set_width(label1, LV_HOR_RES);
     lv_label_set_long_mode(label1, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text_fmt(label1, "Wi-Fi: %s", module->ssid);
+    lv_label_set_text_fmt(label1, "Wi-Fi: %s", wifi->ssid);
 
     wifi_status_label = lv_label_create(scr);
-    lv_label_set_text(wifi_status_label, module->wifi_status);
+    lv_label_set_text(wifi_status_label, wifi->wifi_status);
 
     lv_obj_t *label3 = lv_label_create(scr);
     lv_label_set_text(label3, "Wi-Fi (for setup):");
 
     lv_obj_t *label4 = lv_label_create(scr);
-    lv_label_set_text(label4, module->ap_ssid);
+    lv_label_set_text(label4, wifi->ap_ssid);
 
     return scr;
 }
@@ -186,7 +184,7 @@ static lv_obj_t * create_scr_logo() {
     return scr;
 }
 
-static lv_obj_t * create_scr_urls(SystemModule * module) {
+static lv_obj_t * create_scr_urls(stratum_module_t *strat, wifi_state_t *wifi) {
     lv_obj_t * scr = lv_obj_create(NULL);
 
     lv_obj_set_flex_flow(scr, LV_FLEX_FLOW_COLUMN);
@@ -198,13 +196,13 @@ static lv_obj_t * create_scr_urls(SystemModule * module) {
     mining_url_scr_urls_label = lv_label_create(scr);
     lv_obj_set_width(mining_url_scr_urls_label, LV_HOR_RES);
     lv_label_set_long_mode(mining_url_scr_urls_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-    lv_label_set_text(mining_url_scr_urls_label, module->is_using_fallback ? module->fallback_pool_url : module->pool_url);
+    lv_label_set_text(mining_url_scr_urls_label, strat->is_using_fallback ? strat->fallback.url : strat->primary.url);
 
     lv_obj_t *label3 = lv_label_create(scr);
     lv_label_set_text(label3, "Nano IP:");
 
     ip_addr_scr_urls_label = lv_label_create(scr);
-    lv_label_set_text(ip_addr_scr_urls_label, module->ip_addr_str);
+    lv_label_set_text(ip_addr_scr_urls_label, wifi->ip_addr_str);
 
     return scr;
 }
@@ -247,11 +245,17 @@ static void screen_show(screen_t screen)
 
 static void screen_update_cb(lv_timer_t * timer)
 {
-    if (GLOBAL_STATE->SELF_TEST_MODULE.active) {
+    extern app_context_t APP_CONTEXT;
+    self_test_state_t *self_test = &APP_CONTEXT.self_test;
+    ota_state_t *ota = &APP_CONTEXT.ota;
+    wifi_state_t *wifi = &APP_CONTEXT.wifi;
+    power_module_t *pwr = &APP_CONTEXT.power;
+    stats_module_t *stats = &APP_CONTEXT.stats;
+    stratum_module_t *strat = &APP_CONTEXT.stratum;
+
+    if (self_test->active) {
 
         screen_show(SCR_SELF_TEST);
-
-        SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;
 
         lv_label_set_text(self_test_message_label, self_test->message);
 
@@ -268,41 +272,39 @@ static void screen_update_cb(lv_timer_t * timer)
         return;
     }
 
-    if (GLOBAL_STATE->SYSTEM_MODULE.is_firmware_update) {
-        if (strcmp(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
-            lv_label_set_text(firmware_update_scr_filename_label, GLOBAL_STATE->SYSTEM_MODULE.firmware_update_filename);
+    if (ota->is_updating) {
+        if (strcmp(ota->filename, lv_label_get_text(firmware_update_scr_filename_label)) != 0) {
+            lv_label_set_text(firmware_update_scr_filename_label, ota->filename);
         }
-        if (strcmp(GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
-            lv_label_set_text(firmware_update_scr_status_label, GLOBAL_STATE->SYSTEM_MODULE.firmware_update_status);
+        if (strcmp(ota->status, lv_label_get_text(firmware_update_scr_status_label)) != 0) {
+            lv_label_set_text(firmware_update_scr_status_label, ota->status);
         }
         screen_show(SCR_FIRMWARE_UPDATE);
         return;
     }
 
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    if (module->asic_status) {
-        lv_label_set_text(asic_status_label, module->asic_status);
+    if (APP_CONTEXT.asic_status) {
+        lv_label_set_text(asic_status_label, APP_CONTEXT.asic_status);
         screen_show(SCR_ASIC_STATUS);
         return;
     }
 
-    if (module->overheat_mode == 1) {
-        if (strcmp(module->ip_addr_str, lv_label_get_text(ip_addr_scr_overheat_label)) != 0) {
-            lv_label_set_text(ip_addr_scr_overheat_label, module->ip_addr_str);
+    if (pwr->overheat_mode == 1) {
+        if (strcmp(wifi->ip_addr_str, lv_label_get_text(ip_addr_scr_overheat_label)) != 0) {
+            lv_label_set_text(ip_addr_scr_overheat_label, wifi->ip_addr_str);
         }
         screen_show(SCR_OVERHEAT);
         return;
     }
 
-    if (module->ssid[0] == '\0') {
+    if (wifi->ssid[0] == '\0') {
         screen_show(SCR_CONFIGURE);
         return;
     }
 
-    if (module->ap_enabled) {
-        if (strcmp(module->wifi_status, lv_label_get_text(wifi_status_label)) != 0) {
-            lv_label_set_text(wifi_status_label, module->wifi_status);
+    if (wifi->ap_enabled) {
+        if (strcmp(wifi->wifi_status, lv_label_get_text(wifi_status_label)) != 0) {
+            lv_label_set_text(wifi_status_label, wifi->wifi_status);
         }
         screen_show(SCR_CONNECTION);
         return;
@@ -327,50 +329,48 @@ static void screen_update_cb(lv_timer_t * timer)
 
     // Carousel
 
-    PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
-
-    char *pool_url = module->is_using_fallback ? module->fallback_pool_url : module->pool_url;
+    char *pool_url = strat->is_using_fallback ? strat->fallback.url : strat->primary.url;
     if (strcmp(lv_label_get_text(mining_url_scr_urls_label), pool_url) != 0) {
         lv_label_set_text(mining_url_scr_urls_label, pool_url);
     }
 
-    if (strcmp(lv_label_get_text(ip_addr_scr_urls_label), module->ip_addr_str) != 0) {
-        lv_label_set_text(ip_addr_scr_urls_label, module->ip_addr_str);
+    if (strcmp(lv_label_get_text(ip_addr_scr_urls_label), wifi->ip_addr_str) != 0) {
+        lv_label_set_text(ip_addr_scr_urls_label, wifi->ip_addr_str);
     }
 
-    if (current_hashrate != module->current_hashrate) {
-        lv_label_set_text_fmt(hashrate_label, "Gh/s: %.2f", module->current_hashrate);
+    if (current_hashrate != stats->hashrate) {
+        lv_label_set_text_fmt(hashrate_label, "Gh/s: %.2f", stats->hashrate);
     }
 
-    if (current_power != power_management->power || current_hashrate != module->current_hashrate) {
-        if (power_management->power > 0 && module->current_hashrate > 0) {
-            float efficiency = power_management->power / (module->current_hashrate / 1000.0);
+    if (current_power != pwr->power || current_hashrate != stats->hashrate) {
+        if (pwr->power > 0 && stats->hashrate > 0) {
+            float efficiency = pwr->power / (stats->hashrate / 1000.0);
             lv_label_set_text_fmt(efficiency_label, "J/Th: %.2f", efficiency);
         }
     }
 
-    if (module->FOUND_BLOCK && !found_block) {
+    if (stats->found_block && !found_block) {
         found_block = true;
 
         lv_obj_set_width(difficulty_label, LV_HOR_RES);
         lv_label_set_long_mode(difficulty_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-        lv_label_set_text_fmt(difficulty_label, "Best: %s   !!! BLOCK FOUND !!!", module->best_session_diff_string);
+        lv_label_set_text_fmt(difficulty_label, "Best: %s   !!! BLOCK FOUND !!!", stats->best_session_diff_string);
 
         screen_show(SCR_STATS);
     } else {
-        if (current_difficulty != module->best_session_nonce_diff) {
-            lv_label_set_text_fmt(difficulty_label, "Best: %s/%s", module->best_session_diff_string, module->best_diff_string);
+        if (current_difficulty != stats->best_session_nonce_diff) {
+            lv_label_set_text_fmt(difficulty_label, "Best: %s/%s", stats->best_session_diff_string, stats->best_diff_string);
         }
     }
 
-    if (current_chip_temp != power_management->chip_temp_avg && power_management->chip_temp_avg > 0) {
-        lv_label_set_text_fmt(chip_temp_label, "Temp: %.1f C", power_management->chip_temp_avg);
+    if (current_chip_temp != pwr->chip_temp_avg && pwr->chip_temp_avg > 0) {
+        lv_label_set_text_fmt(chip_temp_label, "Temp: %.1f C", pwr->chip_temp_avg);
     }
 
-    current_hashrate = module->current_hashrate;
-    current_power = power_management->power;
-    current_difficulty = module->best_session_nonce_diff;
-    current_chip_temp = power_management->chip_temp_avg;
+    current_hashrate = stats->hashrate;
+    current_power = pwr->power;
+    current_difficulty = stats->best_session_nonce_diff;
+    current_chip_temp = pwr->chip_temp_avg;
 
     if (CAROUSEL_DELAY_COUNT > current_screen_counter || found_block) {
         return;
@@ -388,19 +388,21 @@ void screen_next()
 
 esp_err_t screen_start(void * pvParameters)
 {
-    GLOBAL_STATE = (GlobalState *) pvParameters;
+    (void)pvParameters;
+    extern app_context_t APP_CONTEXT;
 
-    if (GLOBAL_STATE->SYSTEM_MODULE.is_screen_active) {
-        SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
+    if (APP_CONTEXT.is_screen_active) {
+        wifi_state_t *wifi = &APP_CONTEXT.wifi;
+        stratum_module_t *strat = &APP_CONTEXT.stratum;
 
         screens[SCR_SELF_TEST] = create_scr_self_test();
-        screens[SCR_OVERHEAT] = create_scr_overheat(module);
-        screens[SCR_ASIC_STATUS] = create_scr_asic_status(module);
-        screens[SCR_CONFIGURE] = create_scr_configure(module);
-        screens[SCR_FIRMWARE_UPDATE] = create_scr_ota(module);
-        screens[SCR_CONNECTION] = create_scr_connection(module);
+        screens[SCR_OVERHEAT] = create_scr_overheat(wifi);
+        screens[SCR_ASIC_STATUS] = create_scr_asic_status();
+        screens[SCR_CONFIGURE] = create_scr_configure(wifi);
+        screens[SCR_FIRMWARE_UPDATE] = create_scr_ota();
+        screens[SCR_CONNECTION] = create_scr_connection(wifi);
         screens[SCR_LOGO] = create_scr_logo();
-        screens[SCR_URLS] = create_scr_urls(module);
+        screens[SCR_URLS] = create_scr_urls(strat, wifi);
         screens[SCR_STATS] = create_scr_stats();
 
         lv_timer_create(screen_update_cb, SCREEN_UPDATE_MS, NULL);

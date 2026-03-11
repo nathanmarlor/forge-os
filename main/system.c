@@ -213,13 +213,6 @@ void SYSTEM_led_blink(int num)
     switch_led(num, 1);
 }
 
-void SYSTEM_notify_mining_started(GlobalState * GLOBAL_STATE)
-{
-    SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
-
-    module->duration_start = esp_timer_get_time();
-}
-
 
 /* Convert a uint64_t value into a truncated string for displaying with its
  * associated suitable for Mega, Giga etc. Buf array needs to be long enough */

@@ -3,14 +3,6 @@
 
 /**
  * Application context - the new top-level container for forge-os.
- *
- * Migration strategy:
- *   Phase 1 (current): app_context_t wraps the existing GlobalState.
- *                       Modules can access either the new context or
- *                       the legacy state during the transition.
- *   Phase 2+:           Modules are extracted one by one. Each module's
- *                       state moves out of GlobalState into a module struct.
- *   Final:              GlobalState is removed entirely.
  */
 
 #include <stdbool.h>
@@ -23,6 +15,30 @@
 #include "stratum_module.h"
 #include "asic_module.h"
 #include "work_queue.h"
+
+// ---- WiFi / Network state ----
+typedef struct {
+    char ssid[32];
+    char wifi_status[20];
+    char ip_addr_str[16];
+    char ap_ssid[32];
+    bool ap_enabled;
+} wifi_state_t;
+
+// ---- OTA / Firmware update state ----
+typedef struct {
+    bool is_updating;
+    char filename[20];
+    char status[20];
+} ota_state_t;
+
+// ---- Self-test state ----
+typedef struct {
+    bool active;
+    char *message;
+    bool result;
+    bool finished;
+} self_test_state_t;
 
 typedef struct {
     // ---- Device identity (immutable after boot) ----
@@ -50,9 +66,20 @@ typedef struct {
     stratum_module_t stratum;
     asic_module_t asic;
 
+    // ---- System state ----
+    wifi_state_t wifi;
+    ota_state_t ota;
+    self_test_state_t self_test;
+    bool is_screen_active;
+    char *asic_status;      // NULL when ASIC is OK, error string otherwise
+    char reset_reason[32];
+
+    // ---- Coinbase data (from stratum) ----
+    coinbase_output_t coinbase_outputs[MAX_COINBASE_TX_OUTPUTS];
+    int coinbase_output_count;
+    uint64_t coinbase_value_total_satoshis;
+
     // ---- Legacy bridge ----
-    // During migration, modules that haven't been extracted yet
-    // continue to use GLOBAL_STATE through this pointer.
     GlobalState *legacy;
 
 } app_context_t;
@@ -73,6 +100,7 @@ static inline void app_context_init_from_legacy(app_context_t *ctx, GlobalState 
     ctx->asic_difficulty = gs->ASIC_difficulty;
     ctx->asic_job_frequency_ms = gs->asic_job_frequency_ms;
     ctx->psram_available = gs->psram_is_available;
+    ctx->asic_status = NULL;
     ctx->legacy = gs;
 }
 

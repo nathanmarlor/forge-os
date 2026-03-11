@@ -1,4 +1,3 @@
-#include "system.h"
 #include "work_queue.h"
 #include "serial.h"
 #include <string.h>
@@ -22,11 +21,10 @@ void ASIC_task(void *pvParameters)
     // Initialize the ASIC module (creates semaphore, zeroes arrays)
     asic_module_init(asic, APP_CONTEXT.asic_job_frequency_ms, APP_CONTEXT.asic_difficulty);
 
-    // Bridge: alias GlobalState pointers to module's arrays
+    // Bridge: alias GlobalState pointers to module's arrays (for legacy consumers)
     asic_module_bridge_legacy(asic, GLOBAL_STATE);
 
     ESP_LOGI(TAG, "ASIC Job Interval: %.2f ms", asic->job_interval_ms);
-    SYSTEM_notify_mining_started(GLOBAL_STATE);
     ESP_LOGI(TAG, "ASIC Ready!");
 
     while (1)

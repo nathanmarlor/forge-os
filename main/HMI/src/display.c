@@ -10,8 +10,8 @@
 #include "lvgl.h"
 #include "lvgl__lvgl/src/themes/lv_theme_private.h"
 #include "esp_lvgl_port.h"
-#include "global_state.h"
 #include "nvs_config.h"
+#include "app_context.h"
 #include "i2c_bitforge.h"
 #include "driver/i2c_master.h"
 #include "driver/i2c_types.h"
@@ -39,7 +39,8 @@ static void theme_apply(lv_theme_t *theme, lv_obj_t *obj) {
 
 esp_err_t display_init(void * pvParameters)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+    (void)pvParameters;
+    extern app_context_t APP_CONTEXT;
 
     uint8_t flip_screen = nvs_config_get_u16(NVS_CONFIG_FLIP_SCREEN, 1);
     uint8_t invert_screen = nvs_config_get_u16(NVS_CONFIG_INVERT_SCREEN, 0);
@@ -125,7 +126,7 @@ esp_err_t display_init(void * pvParameters)
         // Only turn on the screen when it has been cleared
         ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel_handle, true), TAG, "Panel display on failed");   
 
-        GLOBAL_STATE->SYSTEM_MODULE.is_screen_active = true;
+        APP_CONTEXT.is_screen_active = true;
     } else {
         ESP_LOGW(TAG, "No display found.");
     }
