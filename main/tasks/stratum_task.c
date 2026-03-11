@@ -49,7 +49,6 @@ bool is_wifi_connected() {
 
 static void clean_queue(app_context_t *ctx)
 {
-    ESP_LOGI(TAG, "Clean Jobs: clearing queue");
     ctx->abandon_work = 1;
     queue_clear(&ctx->stratum_queue);
 
@@ -376,6 +375,10 @@ void stratum_task(void * pvParameters)
                 decode_mining_notification(strat, stratum_api_v1_message.mining_notification);
                 if (stratum_api_v1_message.should_abandon_work &&
                     (APP_CONTEXT.stratum_queue.count > 0 || APP_CONTEXT.ASIC_jobs_queue.count > 0)) {
+                    ESP_LOGI(TAG, "Clean Jobs: new_job=%s (abandoning %d queued + %d ASIC jobs)",
+                             stratum_api_v1_message.mining_notification->job_id,
+                             APP_CONTEXT.stratum_queue.count,
+                             APP_CONTEXT.ASIC_jobs_queue.count);
                     clean_queue(&APP_CONTEXT);
                 }
                 // Drop oldest notification if queue is full (non-blocking to avoid TOCTOU deadlock)

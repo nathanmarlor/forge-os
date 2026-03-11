@@ -1111,7 +1111,9 @@ void send_log_to_websocket(char *message)
     if (server != NULL && fd >= 0) {
         // Send the WebSocket frame asynchronously
         if (httpd_ws_send_frame_async(server, fd, &ws_pkt) != ESP_OK) {
-            esp_log_set_vprintf(vprintf);
+            // Mark fd as stale; don't disable log_to_queue — a new
+            // websocket connection will set a fresh fd via echo_handler.
+            fd = -1;
         }
     }
 
