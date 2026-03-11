@@ -21,6 +21,7 @@
 #include "stats.h"
 #include "power_module.h"
 #include "stratum_module.h"
+#include "asic_module.h"
 
 typedef struct {
     // ---- Device identity (immutable after boot) ----
@@ -40,6 +41,7 @@ typedef struct {
     stats_module_t stats;
     power_module_t power;
     stratum_module_t stratum;
+    asic_module_t asic;
 
     // ---- Legacy bridge ----
     // During migration, modules that haven't been extracted yet

@@ -9,6 +9,8 @@
 #include "string.h"
 
 #include "asic.h"
+#include "app_context.h"
+#include "asic_module.h"
 
 static const char *TAG = "create_jobs_task";
 
@@ -60,7 +62,8 @@ void create_jobs_task(void *pvParameters)
         {
             GLOBAL_STATE->abandon_work = 0;
             ASIC_jobs_queue_clear(&GLOBAL_STATE->ASIC_jobs_queue);
-            xSemaphoreGive(GLOBAL_STATE->ASIC_TASK_MODULE.semaphore);
+            extern app_context_t APP_CONTEXT;
+            xSemaphoreGive(APP_CONTEXT.asic.dispatch_semaphore);
         }
 
         STRATUM_V1_free_mining_notify(mining_notification);
