@@ -199,6 +199,9 @@ void app_main(void)
 
     queue_init(&GLOBAL_STATE.stratum_queue);
     queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
+    queue_init(&APP_CONTEXT.stratum_queue);
+    queue_init(&APP_CONTEXT.ASIC_jobs_queue);
+    APP_CONTEXT.abandon_work = 0;
 
     SERIAL_init();
 

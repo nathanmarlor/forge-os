@@ -578,8 +578,8 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         APP_CONTEXT.stratum.is_using_fallback = use_fallback;
         GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback = use_fallback; // Legacy sync
         config_set_u16(config, NVS_CONFIG_USE_FALLBACK_STRATUM, use_fallback ? 1 : 0);
-        if (GLOBAL_STATE->sock >= 0) {
-            shutdown(GLOBAL_STATE->sock, SHUT_RDWR);
+        if (APP_CONTEXT.stratum.sock >= 0) {
+            shutdown(APP_CONTEXT.stratum.sock, SHUT_RDWR);
         }
     }
     if ((item = cJSON_GetObjectItem(root, "statsFrequency")) != NULL) {
