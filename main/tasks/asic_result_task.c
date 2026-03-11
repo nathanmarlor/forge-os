@@ -17,14 +17,13 @@ static const char *TAG = "asic_result";
 
 void ASIC_result_task(void *pvParameters)
 {
-    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
     extern app_context_t APP_CONTEXT;
     asic_module_t *asic = &APP_CONTEXT.asic;
     stratum_module_t *strat = &APP_CONTEXT.stratum;
 
     while (1)
     {
-        task_result *asic_result = ASIC_process_work(GLOBAL_STATE);
+        task_result *asic_result = ASIC_process_work(APP_CONTEXT.device_model, asic);
 
         if (asic_result == NULL)
         {
@@ -96,7 +95,7 @@ void ASIC_result_task(void *pvParameters)
 
             if (ret < 0) {
                 ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
-                stratum_close_connection(GLOBAL_STATE);
+                stratum_close_connection();
             }
         }
 

@@ -8,17 +8,17 @@
 
 static const char *TAG = "asic";
 
-uint8_t ASIC_init(GlobalState * GLOBAL_STATE) {
-    switch (GLOBAL_STATE->device_model) {
+uint8_t ASIC_init(DeviceModel device_model, float initial_frequency) {
+    switch (device_model) {
         case BITFORGE_NANO:
-            return BM1370_init(GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value, BITFORGE_NANO_ASIC_COUNT);
+            return BM1370_init(initial_frequency, BITFORGE_NANO_ASIC_COUNT);
         default:
     }
     return ESP_OK;
 }
 
-uint8_t ASIC_get_asic_count(GlobalState * GLOBAL_STATE) {
-    switch (GLOBAL_STATE->device_model) {
+uint8_t ASIC_get_asic_count(DeviceModel device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             return BITFORGE_NANO_ASIC_COUNT;
         default:
@@ -26,8 +26,8 @@ uint8_t ASIC_get_asic_count(GlobalState * GLOBAL_STATE) {
     return 0;
 }
 
-uint16_t ASIC_get_small_core_count(GlobalState * GLOBAL_STATE) {
-    switch (GLOBAL_STATE->device_model) {
+uint16_t ASIC_get_small_core_count(DeviceModel device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             return BM1370_SMALL_CORE_COUNT;
         default:
@@ -36,18 +36,18 @@ uint16_t ASIC_get_small_core_count(GlobalState * GLOBAL_STATE) {
 }
 
 // .receive_result_fn = BM1366_process_work,
-task_result * ASIC_process_work(GlobalState * GLOBAL_STATE) {
-    switch (GLOBAL_STATE->device_model) {
+task_result * ASIC_process_work(DeviceModel device_model, asic_module_t *asic) {
+    switch (device_model) {
         case BITFORGE_NANO:
-            return BM1370_process_work(GLOBAL_STATE);
+            return BM1370_process_work(asic);
         default:
     }
     return NULL;
 }
 
 // .set_max_baud_fn = BM1366_set_max_baud,
-int ASIC_set_max_baud(GlobalState * GLOBAL_STATE) {
-    switch (GLOBAL_STATE->device_model) {
+int ASIC_set_max_baud(DeviceModel device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             return BM1370_set_max_baud();
         default:
@@ -56,8 +56,8 @@ int ASIC_set_max_baud(GlobalState * GLOBAL_STATE) {
 }
 
 // .set_difficulty_mask_fn = BM1366_set_job_difficulty_mask,
-void ASIC_set_job_difficulty_mask(GlobalState * GLOBAL_STATE, uint8_t mask) {
-    switch (GLOBAL_STATE->device_model) {
+void ASIC_set_job_difficulty_mask(DeviceModel device_model, uint8_t mask) {
+    switch (device_model) {
         case BITFORGE_NANO:
             BM1370_set_job_difficulty_mask(mask);
             break;
@@ -66,10 +66,10 @@ void ASIC_set_job_difficulty_mask(GlobalState * GLOBAL_STATE, uint8_t mask) {
 }
 
 // .send_work_fn = BM1366_send_work,
-void ASIC_send_work(GlobalState * GLOBAL_STATE, void * next_job) {
-    switch (GLOBAL_STATE->device_model) {
+void ASIC_send_work(DeviceModel device_model, asic_module_t *asic, bm_job *next_job) {
+    switch (device_model) {
         case BITFORGE_NANO:
-            BM1370_send_work(GLOBAL_STATE, next_job);
+            BM1370_send_work(asic, next_job);
             break;
         default:
     return;
@@ -77,8 +77,8 @@ void ASIC_send_work(GlobalState * GLOBAL_STATE, void * next_job) {
 }
 
 // .set_version_mask = BM1366_set_version_mask
-void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask) {
-    switch (GLOBAL_STATE->device_model) {
+void ASIC_set_version_mask(DeviceModel device_model, uint32_t mask) {
+    switch (device_model) {
         case BITFORGE_NANO:
             BM1370_set_version_mask(mask);
             break;
@@ -87,11 +87,11 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask) {
     }
 }
 
-bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency) {
+bool ASIC_set_frequency(AsicModel asic_model, float target_frequency) {
     ESP_LOGI(TAG, "Setting ASIC frequency to %.2f MHz", target_frequency);
     bool success = false;
-    
-    switch (GLOBAL_STATE->asic_model) {
+
+    switch (asic_model) {
         case ASIC_BM1370:
             success = BM1370_set_frequency(target_frequency);
             break;
@@ -100,13 +100,13 @@ bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency) {
             success = false;
             break;
     }
-    
+
     if (success) {
         ESP_LOGI(TAG, "Successfully transitioned to new ASIC frequency: %.2f MHz", target_frequency);
     } else {
         ESP_LOGE(TAG, "Failed to transition to new ASIC frequency: %.2f MHz", target_frequency);
     }
-    
+
     return success;
 }
 

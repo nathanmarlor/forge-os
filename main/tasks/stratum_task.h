@@ -1,9 +1,7 @@
 #ifndef STRATUM_TASK_H_
 #define STRATUM_TASK_H_
 
-#include "global_state.h"
-
 void stratum_task(void *pvParameters);
-void stratum_close_connection(GlobalState * GLOBAL_STATE);
+void stratum_close_connection(void);
 
 #endif
