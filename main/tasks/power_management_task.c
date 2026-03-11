@@ -4,7 +4,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
-#include "global_state.h"
 #include "math.h"
 #include "mining.h"
 #include "nvs_config.h"
@@ -138,27 +137,11 @@ static void publish_power_update(const power_module_t *pwr)
     event_bus_publish(&evt);
 }
 
-// Sync power module state to legacy GlobalState (dual-write during migration)
-static void sync_to_legacy(const power_module_t *pwr, PowerManagementModule *legacy)
-{
-    legacy->voltage = pwr->voltage;
-    legacy->power = pwr->power;
-    legacy->current = pwr->current;
-    legacy->vr_temp = pwr->vr_temp;
-    legacy->fan_perc = pwr->fan_perc;
-    memcpy(legacy->fan_rpm, pwr->fan_rpm, sizeof(pwr->fan_rpm));
-    memcpy(legacy->chip_temp, pwr->chip_temp, sizeof(legacy->chip_temp));
-    legacy->chip_temp_avg = pwr->chip_temp_avg;
-    legacy->frequency_value = pwr->frequency_value;
-    legacy->frequency_multiplier = pwr->frequency_multiplier;
-}
-
 void POWER_MANAGEMENT_task(void * pvParameters)
 {
     ESP_LOGI(TAG, "Starting");
 
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
-    PowerManagementModule * legacy_pm = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
+    (void)pvParameters;
 
     extern app_context_t APP_CONTEXT;
     config_module_t *config = &APP_CONTEXT.config;
@@ -167,7 +150,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     // Initialize power module
     power_module_init(pwr);
-    pwr->frequency_value = legacy_pm->frequency_value; // Preserve NVS-loaded value
+    pwr->frequency_value = config_get_u16(config, NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
     // Subscribe to config change events
     QueueHandle_t config_queue = xQueueCreate(CONFIG_EVENT_QUEUE_SIZE, sizeof(event_t));
@@ -280,19 +263,13 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         uint16_t new_overheat_mode = config_get_u16(config, NVS_CONFIG_OVERHEAT_MODE, 0);
         if (new_overheat_mode != pwr->overheat_mode) {
             pwr->overheat_mode = new_overheat_mode;
-            GLOBAL_STATE->SYSTEM_MODULE.overheat_mode = new_overheat_mode; // Legacy sync
             ESP_LOGI(TAG, "Overheat mode updated to: %d", pwr->overheat_mode);
         }
 
         VCORE_check_fault(dm, &pwr->power_fault);
-        GLOBAL_STATE->SYSTEM_MODULE.power_fault = pwr->power_fault; // Legacy sync
-
         // Publish events
         publish_temp_update(pwr);
         publish_power_update(pwr);
-
-        // Dual-write to legacy GlobalState during migration
-        sync_to_legacy(pwr, legacy_pm);
 
         even = !even;
         vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
