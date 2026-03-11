@@ -64,7 +64,9 @@ void stratum_close_connection(void)
     extern app_context_t APP_CONTEXT;
     stratum_module_t *strat = &APP_CONTEXT.stratum;
 
+    pthread_mutex_lock(&strat->connection_lock);
     if (strat->sock < 0) {
+        pthread_mutex_unlock(&strat->connection_lock);
         ESP_LOGE(TAG, "Socket already shutdown, not shutting down again..");
         return;
     }
@@ -73,6 +75,7 @@ void stratum_close_connection(void)
     shutdown(strat->sock, SHUT_RDWR);
     close(strat->sock);
     strat->sock = -1;
+    pthread_mutex_unlock(&strat->connection_lock);
     clean_queue(&APP_CONTEXT);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
@@ -375,9 +378,10 @@ void stratum_task(void * pvParameters)
                     (APP_CONTEXT.stratum_queue.count > 0 || APP_CONTEXT.ASIC_jobs_queue.count > 0)) {
                     clean_queue(&APP_CONTEXT);
                 }
-                if (APP_CONTEXT.stratum_queue.count == QUEUE_SIZE) {
-                    mining_notify * next_notify_json_str = (mining_notify *) queue_dequeue(&APP_CONTEXT.stratum_queue);
-                    STRATUM_V1_free_mining_notify(next_notify_json_str);
+                // Drop oldest notification if queue is full (non-blocking to avoid TOCTOU deadlock)
+                mining_notify *dropped = (mining_notify *)queue_try_dequeue(&APP_CONTEXT.stratum_queue);
+                if (dropped) {
+                    STRATUM_V1_free_mining_notify(dropped);
                 }
                 stratum_api_v1_message.mining_notification->difficulty = strat->stratum_difficulty;
                 queue_enqueue(&APP_CONTEXT.stratum_queue, stratum_api_v1_message.mining_notification);
@@ -395,11 +399,13 @@ void stratum_task(void * pvParameters)
                 strat->version_mask = stratum_api_v1_message.version_mask;
                 strat->new_version_rolling_msg = true;
             } else if (stratum_api_v1_message.method == STRATUM_RESULT_SUBSCRIBE) {
+                pthread_mutex_lock(&strat->connection_lock);
                 if (strat->extranonce_str) {
                     free(strat->extranonce_str);
                 }
                 strat->extranonce_str = stratum_api_v1_message.extranonce_str;
                 strat->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
+                pthread_mutex_unlock(&strat->connection_lock);
             } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {
                 ESP_LOGE(TAG, "Pool requested client reconnect...");
                 stratum_close_connection();

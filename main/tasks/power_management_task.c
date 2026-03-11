@@ -1,6 +1,7 @@
 #include <string.h>
 #include "INA260.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -216,7 +217,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             config_set_u16(config, NVS_CONFIG_FAN_SPEED, 100);
             config_set_u16(config, NVS_CONFIG_AUTO_FAN_SPEED, 0);
             config_set_u16(config, NVS_CONFIG_OVERHEAT_MODE, 1);
-            exit(EXIT_FAILURE);
+            esp_restart();
         }
 
         if (config_get_u16(config, NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {

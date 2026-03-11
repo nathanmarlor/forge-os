@@ -16,6 +16,7 @@ void stratum_module_init(stratum_module_t *module,
         module->fallback = *fallback;
     }
 
+    pthread_mutex_init(&module->connection_lock, NULL);
     module->stratum_difficulty = 8192; // Default
     module->initialized = true;
 }

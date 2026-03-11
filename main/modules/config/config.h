@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <pthread.h>
 #include "esp_err.h"
 
 /**
@@ -46,6 +47,7 @@ typedef struct {
     uint16_t fallback_stratum_port;
 
     bool initialized;
+    pthread_mutex_t lock;
 } config_module_t;
 
 /**

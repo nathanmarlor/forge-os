@@ -81,21 +81,27 @@ void ASIC_result_task(void *pvParameters)
 
         if (should_submit)
         {
-            const pool_config_t *pool = stratum_get_active_pool(strat);
-            stratum_rtt_start(strat);
-            int ret = STRATUM_V1_submit_share(
-                strat->sock,
-                strat->send_uid++,
-                pool->username,
-                jobid_buf,
-                extranonce2_buf,
-                ntime,
-                asic_result->nonce,
-                asic_result->rolled_version ^ job_version);
+            pthread_mutex_lock(&strat->connection_lock);
+            if (strat->sock < 0) {
+                pthread_mutex_unlock(&strat->connection_lock);
+            } else {
+                const pool_config_t *pool = stratum_get_active_pool(strat);
+                stratum_rtt_start(strat);
+                int ret = STRATUM_V1_submit_share(
+                    strat->sock,
+                    strat->send_uid++,
+                    pool->username,
+                    jobid_buf,
+                    extranonce2_buf,
+                    ntime,
+                    asic_result->nonce,
+                    asic_result->rolled_version ^ job_version);
+                pthread_mutex_unlock(&strat->connection_lock);
 
-            if (ret < 0) {
-                ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
-                stratum_close_connection();
+                if (ret < 0) {
+                    ESP_LOGI(TAG, "Unable to write share to socket. Closing connection. Ret: %d (errno %d: %s)", ret, errno, strerror(errno));
+                    stratum_close_connection();
+                }
             }
         }
 

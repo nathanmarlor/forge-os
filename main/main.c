@@ -154,11 +154,13 @@ void app_main(void)
 
     if (result_bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "Connected to SSID: %s", wifi_ssid);
-        strncpy(APP_CONTEXT.wifi.wifi_status, "Connected!", sizeof(APP_CONTEXT.wifi.wifi_status));
+        strncpy(APP_CONTEXT.wifi.wifi_status, "Connected!", sizeof(APP_CONTEXT.wifi.wifi_status) - 1);
+        APP_CONTEXT.wifi.wifi_status[sizeof(APP_CONTEXT.wifi.wifi_status) - 1] = '\0';
     } else if (result_bits & WIFI_FAIL_BIT) {
         ESP_LOGE(TAG, "Failed to connect to SSID: %s", wifi_ssid);
 
-        strncpy(APP_CONTEXT.wifi.wifi_status, "Failed to connect", sizeof(APP_CONTEXT.wifi.wifi_status));
+        strncpy(APP_CONTEXT.wifi.wifi_status, "Failed to connect", sizeof(APP_CONTEXT.wifi.wifi_status) - 1);
+        APP_CONTEXT.wifi.wifi_status[sizeof(APP_CONTEXT.wifi.wifi_status) - 1] = '\0';
         // User might be trying to configure with AP, just chill here
         ESP_LOGI(TAG, "Finished, waiting for user input.");
         while (1) {
@@ -166,7 +168,8 @@ void app_main(void)
         }
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
-        strncpy(APP_CONTEXT.wifi.wifi_status, "unexpected error", sizeof(APP_CONTEXT.wifi.wifi_status));
+        strncpy(APP_CONTEXT.wifi.wifi_status, "unexpected error", sizeof(APP_CONTEXT.wifi.wifi_status) - 1);
+        APP_CONTEXT.wifi.wifi_status[sizeof(APP_CONTEXT.wifi.wifi_status) - 1] = '\0';
         // User might be trying to configure with AP, just chill here
         ESP_LOGI(TAG, "Finished, waiting for user input.");
         while (1) {
