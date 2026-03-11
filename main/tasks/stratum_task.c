@@ -15,6 +15,7 @@
 #include "app_context.h"
 #include "stats.h"
 #include "stratum_module.h"
+#include "asic_module.h"
 
 #define PORT CONFIG_STRATUM_PORT
 #define STRATUM_URL CONFIG_STRATUM_URL
