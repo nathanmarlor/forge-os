@@ -4,14 +4,19 @@
 #include "common.h"
 #include <pthread.h>
 
-#define BM1370_HASH_DOMAINS 4
-
+// measurement_t is defined here for legacy code (asic component).
+// The stats module also uses this type.
+#ifndef MEASUREMENT_T_DEFINED
+#define MEASUREMENT_T_DEFINED
 typedef struct {
     uint32_t value;
     uint32_t time_ms;
     float hashrate;
 } measurement_t;
+#endif
 
+// Legacy HashrateMonitorModule - kept in GlobalState during migration.
+// New code should use stats_module_t from stats.h instead.
 typedef struct {
     measurement_t* total_measurement;
     measurement_t** domain_measurements;
@@ -26,6 +31,5 @@ typedef struct {
 
 void hashrate_monitor_task(void *pvParameters);
 void hashrate_monitor_register_read(void *pvParameters, register_type_t register_type, uint8_t asic_nr, uint32_t value);
-float hash_counter_to_ghs(uint32_t duration_ms, uint32_t counter);
 
 #endif /* HASHRATE_MONITOR_TASK_H_ */

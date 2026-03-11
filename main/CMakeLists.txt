@@ -27,10 +27,14 @@ SRCS
     "./power/INA260.c"
     "./power/power.c"
     "./power/vcore.c"
+    "./modules/config/config.c"
+    "./modules/stats/stats.c"
 
 INCLUDE_DIRS
     "."
     "tasks"
+    "modules/config"
+    "modules/stats"
     "http_server"
     "self_test"
     "../components/asic/include"
@@ -44,6 +48,7 @@ INCLUDE_DIRS
     "power"
 
 PRIV_REQUIRES
+    "event_bus"
     "app_update"
     "driver"
     "esp_adc"
