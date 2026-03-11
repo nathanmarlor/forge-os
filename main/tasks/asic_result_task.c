@@ -75,6 +75,9 @@ void ASIC_result_task(void *pvParameters)
             strncpy(extranonce2_buf, asic->active_jobs[job_id]->extranonce2, sizeof(extranonce2_buf) - 1);
             ntime = asic->active_jobs[job_id]->ntime;
             job_version = asic->active_jobs[job_id]->version;
+            ESP_LOGI(TAG, "Submitting share: job=%s nonce=%08" PRIX32 " diff=%.1f pool_diff=%ld",
+                     jobid_buf, asic_result->nonce, nonce_diff,
+                     asic->active_jobs[job_id]->pool_diff);
         }
 
         pthread_mutex_unlock(asic->jobs_lock);
