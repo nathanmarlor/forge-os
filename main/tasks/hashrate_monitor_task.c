@@ -4,6 +4,7 @@
 #include "global_state.h"
 #include "app_context.h"
 #include "stats.h"
+#include "power_module.h"
 
 #define POLL_RATE 5000
 
@@ -11,9 +12,10 @@ static const char *TAG = "hashrate_monitor";
 
 void hashrate_monitor_task(void *pvParameters)
 {
-    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
+    (void)pvParameters;
     extern app_context_t APP_CONTEXT;
     stats_module_t *stats = &APP_CONTEXT.stats;
+    power_module_t *pwr = &APP_CONTEXT.power;
 
     TickType_t taskWakeTime = xTaskGetTickCount();
     while (1) {
@@ -22,7 +24,7 @@ void hashrate_monitor_task(void *pvParameters)
         vTaskDelay(100 / portTICK_PERIOD_MS);
 
         // Check for frequency changes and reset measurements
-        float current_freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
+        float current_freq = pwr->frequency_value;
         if (current_freq != stats->frequency_value) {
             stats_reset_measurements(stats);
             stats->frequency_value = current_freq;
