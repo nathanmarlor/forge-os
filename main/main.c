@@ -78,8 +78,6 @@ void app_main(void)
         case ESP_RST_SDIO:      reset_reason_str = "SDIO Reset";                break;
         default:                reset_reason_str = "Unknown";                   break;
     }
-    snprintf(GLOBAL_STATE.SYSTEM_MODULE.reset_reason, sizeof(GLOBAL_STATE.SYSTEM_MODULE.reset_reason),
-             "%s", reset_reason_str);
     snprintf(APP_CONTEXT.reset_reason, sizeof(APP_CONTEXT.reset_reason),
              "%s", reset_reason_str);
     ESP_LOGW(TAG, "Reset reason: %s (%d)", reset_reason_str, reset_reason);
@@ -88,9 +86,9 @@ void app_main(void)
 
     if (!esp_psram_is_initialized()) {
         ESP_LOGE(TAG, "No PSRAM available on ESP32 device!");
-        GLOBAL_STATE.psram_is_available = false;
+        APP_CONTEXT.psram_available = false;
     } else {
-        GLOBAL_STATE.psram_is_available = true;
+        APP_CONTEXT.psram_available = true;
     }
 
     // Init I2C
@@ -101,7 +99,7 @@ void app_main(void)
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
     //Init ADC
-    ADC_init(GLOBAL_STATE.device_model);
+    ADC_init(APP_CONTEXT.device_model);
 
     //initialize the ESP32 NVS
     if (NVSDevice_init() != ESP_OK){
@@ -141,43 +139,35 @@ void app_main(void)
         return;
     }
 
-    SYSTEM_init_system(&GLOBAL_STATE);
+    SYSTEM_init_system();
 
     char * wifi_ssid = config_get_string(&APP_CONTEXT.config, NVS_CONFIG_WIFI_SSID, WIFI_SSID);
     char * wifi_pass = config_get_string(&APP_CONTEXT.config, NVS_CONFIG_WIFI_PASS, WIFI_PASS);
     char * hostname  = config_get_string(&APP_CONTEXT.config, NVS_CONFIG_HOSTNAME, HOSTNAME);
 
-    // copy the wifi ssid to the global state and app context
-    strncpy(GLOBAL_STATE.SYSTEM_MODULE.ssid, wifi_ssid, sizeof(GLOBAL_STATE.SYSTEM_MODULE.ssid));
-    GLOBAL_STATE.SYSTEM_MODULE.ssid[sizeof(GLOBAL_STATE.SYSTEM_MODULE.ssid)-1] = 0;
+    // copy the wifi ssid to app context
     strncpy(APP_CONTEXT.wifi.ssid, wifi_ssid, sizeof(APP_CONTEXT.wifi.ssid));
     APP_CONTEXT.wifi.ssid[sizeof(APP_CONTEXT.wifi.ssid)-1] = 0;
 
-    // init AP and connect to wifi (writes IP into both buffers)
+    // init AP and connect to wifi
     wifi_init(wifi_ssid, wifi_pass, hostname, APP_CONTEXT.wifi.ip_addr_str);
-
     generate_ssid(APP_CONTEXT.wifi.ap_ssid);
-    // Legacy sync
-    strncpy(GLOBAL_STATE.SYSTEM_MODULE.ap_ssid, APP_CONTEXT.wifi.ap_ssid, sizeof(GLOBAL_STATE.SYSTEM_MODULE.ap_ssid));
-    memcpy(GLOBAL_STATE.SYSTEM_MODULE.ip_addr_str, APP_CONTEXT.wifi.ip_addr_str, sizeof(GLOBAL_STATE.SYSTEM_MODULE.ip_addr_str));
 
-    SYSTEM_init_peripherals(&GLOBAL_STATE);
+    SYSTEM_init_peripherals();
 
-    xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+    xTaskCreate(POWER_MANAGEMENT_task, "power management", 8192, NULL, 10, NULL);
 
     //start the API for AxeOS
-    start_rest_server((void *) &GLOBAL_STATE);
+    start_rest_server(NULL);
     EventBits_t result_bits = wifi_connect();
 
     if (result_bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "Connected to SSID: %s", wifi_ssid);
         strncpy(APP_CONTEXT.wifi.wifi_status, "Connected!", sizeof(APP_CONTEXT.wifi.wifi_status));
-        strncpy(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, "Connected!", 20);
     } else if (result_bits & WIFI_FAIL_BIT) {
         ESP_LOGE(TAG, "Failed to connect to SSID: %s", wifi_ssid);
 
         strncpy(APP_CONTEXT.wifi.wifi_status, "Failed to connect", sizeof(APP_CONTEXT.wifi.wifi_status));
-        strncpy(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, "Failed to connect", 20);
         // User might be trying to configure with AP, just chill here
         ESP_LOGI(TAG, "Finished, waiting for user input.");
         while (1) {
@@ -186,7 +176,6 @@ void app_main(void)
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
         strncpy(APP_CONTEXT.wifi.wifi_status, "unexpected error", sizeof(APP_CONTEXT.wifi.wifi_status));
-        strncpy(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, "unexpected error", 20);
         // User might be trying to configure with AP, just chill here
         ESP_LOGI(TAG, "Finished, waiting for user input.");
         while (1) {
@@ -198,8 +187,6 @@ void app_main(void)
     free(wifi_pass);
     free(hostname);
 
-    GLOBAL_STATE.new_stratum_version_rolling_msg = false;
-
     // Keep AP active for dual-mode operation (AP + STA)
     // wifi_softap_off();  // Commented out to maintain AP access
     ESP_LOGI(TAG, "AP remains active for dual-mode operation");
@@ -207,17 +194,14 @@ void app_main(void)
     // Create task to turn off AP after 7 minutes if WiFi is connected
     xTaskCreate(&ap_timeout_task, "ap_timeout", 4096, NULL, 1, NULL);
 
-    queue_init(&GLOBAL_STATE.stratum_queue);
-    queue_init(&GLOBAL_STATE.ASIC_jobs_queue);
     queue_init(&APP_CONTEXT.stratum_queue);
     queue_init(&APP_CONTEXT.ASIC_jobs_queue);
     APP_CONTEXT.abandon_work = 0;
 
     SERIAL_init();
 
-    if (ASIC_init(APP_CONTEXT.device_model, GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value) == 0) {
+    if (ASIC_init(APP_CONTEXT.device_model, config_get_u16(&APP_CONTEXT.config, NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY)) == 0) {
         APP_CONTEXT.asic_status = "Chip count 0";
-        GLOBAL_STATE.SYSTEM_MODULE.asic_status = "Chip count 0";
         ESP_LOGE(TAG, "Chip count 0");
         return;
     }
@@ -225,7 +209,6 @@ void app_main(void)
     SERIAL_set_baud(ASIC_set_max_baud(APP_CONTEXT.device_model));
     SERIAL_clear_buffer();
 
-    GLOBAL_STATE.ASIC_initalized = true;
     APP_CONTEXT.asic_initialized = true;
 
     // Initialize stats module (Phase 3) - hashrate, shares, best diff, CPU
@@ -235,12 +218,12 @@ void app_main(void)
         return;
     }
 
-    xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
-    xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+    xTaskCreate(stratum_task, "stratum admin", 8192, NULL, 5, NULL);
+    xTaskCreate(create_jobs_task, "stratum miner", 8192, NULL, 10, NULL);
     xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
-    xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL);
-    xTaskCreate(hashrate_monitor_task, "hashrate monitor", 4096, (void *) &GLOBAL_STATE, 5, NULL);
-    xTaskCreate(cpu_monitor_task, "cpu monitor", 4096, (void *) &GLOBAL_STATE, 2, NULL);
+    xTaskCreate(ASIC_result_task, "asic result", 8192, NULL, 15, NULL);
+    xTaskCreate(hashrate_monitor_task, "hashrate monitor", 4096, NULL, 5, NULL);
+    xTaskCreate(cpu_monitor_task, "cpu monitor", 4096, NULL, 2, NULL);
 }
 
 void MINER_set_wifi_status(wifi_status_t status, int retry_count, int reason)
@@ -272,10 +255,8 @@ void MINER_set_wifi_status(wifi_status_t status, int retry_count, int reason)
             return;
     }
     memcpy(APP_CONTEXT.wifi.wifi_status, buf, sizeof(buf));
-    memcpy(GLOBAL_STATE.SYSTEM_MODULE.wifi_status, buf, sizeof(buf));
 }
 
 void MINER_set_ap_status(bool enabled) {
     APP_CONTEXT.wifi.ap_enabled = enabled;
-    GLOBAL_STATE.SYSTEM_MODULE.ap_enabled = enabled;
 }
