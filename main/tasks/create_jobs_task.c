@@ -19,7 +19,6 @@ static const char *TAG = "create_jobs_task";
 
 void create_jobs_task(void *pvParameters)
 {
-    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
     extern app_context_t APP_CONTEXT;
     stratum_module_t *strat = &APP_CONTEXT.stratum;
 
@@ -36,7 +35,7 @@ void create_jobs_task(void *pvParameters)
 
         if (strat->new_version_rolling_msg) {
             ESP_LOGI(TAG, "Set chip version rolls %i", (int)(strat->version_mask >> 13));
-            ASIC_set_version_mask(GLOBAL_STATE, strat->version_mask);
+            ASIC_set_version_mask(APP_CONTEXT.device_model, strat->version_mask);
             strat->new_version_rolling_msg = false;
         }
 

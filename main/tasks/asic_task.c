@@ -20,7 +20,7 @@ void ASIC_task(void *pvParameters)
     asic_module_t *asic = &APP_CONTEXT.asic;
 
     // Initialize the ASIC module (creates semaphore, zeroes arrays)
-    asic_module_init(asic, GLOBAL_STATE->asic_job_frequency_ms, GLOBAL_STATE->ASIC_difficulty);
+    asic_module_init(asic, APP_CONTEXT.asic_job_frequency_ms, APP_CONTEXT.asic_difficulty);
 
     // Bridge: alias GlobalState pointers to module's arrays
     asic_module_bridge_legacy(asic, GLOBAL_STATE);
@@ -33,7 +33,7 @@ void ASIC_task(void *pvParameters)
     {
         bm_job *next_bm_job = (bm_job *)queue_dequeue(&APP_CONTEXT.ASIC_jobs_queue);
 
-        ASIC_send_work(GLOBAL_STATE, next_bm_job);
+        ASIC_send_work(APP_CONTEXT.device_model, asic, next_bm_job);
 
         // Delay for ASIC(s) to finish the job
         xSemaphoreTake(asic->dispatch_semaphore, (asic->job_interval_ms / portTICK_PERIOD_MS));

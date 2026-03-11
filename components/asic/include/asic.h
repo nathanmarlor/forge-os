@@ -4,18 +4,19 @@
 #include <esp_err.h>
 #include "global_state.h"
 #include "common.h"
+#include "asic_module.h"
 
 #define BITFORGE_NANO_ASIC_COUNT 2
 
-uint8_t ASIC_init(GlobalState * GLOBAL_STATE);
-uint8_t ASIC_get_asic_count(GlobalState * GLOBAL_STATE);
-uint16_t ASIC_get_small_core_count(GlobalState * GLOBAL_STATE);
-task_result * ASIC_process_work(GlobalState * GLOBAL_STATE);
-int ASIC_set_max_baud(GlobalState * GLOBAL_STATE);
-void ASIC_set_job_difficulty_mask(GlobalState * GLOBAL_STATE, uint8_t mask);
-void ASIC_send_work(GlobalState * GLOBAL_STATE, void * next_job);
-void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask);
-bool ASIC_set_frequency(GlobalState * GLOBAL_STATE, float target_frequency);
+uint8_t ASIC_init(DeviceModel device_model, float initial_frequency);
+uint8_t ASIC_get_asic_count(DeviceModel device_model);
+uint16_t ASIC_get_small_core_count(DeviceModel device_model);
+task_result * ASIC_process_work(DeviceModel device_model, asic_module_t *asic);
+int ASIC_set_max_baud(DeviceModel device_model);
+void ASIC_set_job_difficulty_mask(DeviceModel device_model, uint8_t mask);
+void ASIC_send_work(DeviceModel device_model, asic_module_t *asic, bm_job *next_job);
+void ASIC_set_version_mask(DeviceModel device_model, uint32_t mask);
+bool ASIC_set_frequency(AsicModel asic_model, float target_frequency);
 esp_err_t ASIC_set_device_model(GlobalState * GLOBAL_STATE);
 
 #endif // ASIC_H

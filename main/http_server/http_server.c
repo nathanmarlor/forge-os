@@ -715,7 +715,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "hashRate", stats->hashrate);
     cJSON_AddNumberToObject(root, "errorPercentage", stats->error_percentage);
     float expected_hashrate = (float)config_get_u16(config, NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY)
-        * ASIC_get_small_core_count(GLOBAL_STATE) * ASIC_get_asic_count(GLOBAL_STATE) / 1000.0f;
+        * ASIC_get_small_core_count(APP_CONTEXT.device_model) * ASIC_get_asic_count(APP_CONTEXT.device_model) / 1000.0f;
     cJSON_AddNumberToObject(root, "expectedHashrate", expected_hashrate);
     cJSON_AddNumberToObject(root, "bestDiff", stats->best_nonce_diff);
     cJSON_AddStringToObject(root, "bestSessionDiff", stats->best_session_diff_string);
@@ -773,8 +773,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     }
 
     cJSON_AddNumberToObject(root, "uptimeSeconds", (esp_timer_get_time() - stats->start_time) / 1000000);
-    cJSON_AddNumberToObject(root, "asicCount", ASIC_get_asic_count(GLOBAL_STATE));
-    cJSON_AddNumberToObject(root, "smallCoreCount", ASIC_get_small_core_count(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "asicCount", ASIC_get_asic_count(APP_CONTEXT.device_model));
+    cJSON_AddNumberToObject(root, "smallCoreCount", ASIC_get_small_core_count(APP_CONTEXT.device_model));
     cJSON_AddStringToObject(root, "ASICModel", APP_CONTEXT.asic_model_str);
     cJSON_AddStringToObject(root, "stratumURL", stratumURL);
     cJSON_AddStringToObject(root, "fallbackStratumURL", fallbackStratumURL);
@@ -900,8 +900,8 @@ static esp_err_t GET_system_asic(httpd_req_t * req)
     extern app_context_t APP_CONTEXT;
     cJSON_AddStringToObject(root, "ASICModel", APP_CONTEXT.asic_model_str);
     cJSON_AddStringToObject(root, "deviceModel", APP_CONTEXT.device_model_str);
-    cJSON_AddNumberToObject(root, "asicCount", ASIC_get_asic_count(GLOBAL_STATE));
-    cJSON_AddNumberToObject(root, "smallCoreCount", ASIC_get_small_core_count(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "asicCount", ASIC_get_asic_count(APP_CONTEXT.device_model));
+    cJSON_AddNumberToObject(root, "smallCoreCount", ASIC_get_small_core_count(APP_CONTEXT.device_model));
     cJSON_AddNumberToObject(root, "defaultFrequency", CONFIG_ASIC_FREQUENCY);
     cJSON_AddNumberToObject(root, "defaultVoltage", CONFIG_ASIC_VOLTAGE);
 

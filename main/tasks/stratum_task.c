@@ -62,7 +62,7 @@ static void clean_queue(app_context_t *ctx)
     pthread_mutex_unlock(ctx->asic.jobs_lock);
 }
 
-void stratum_close_connection(GlobalState * GLOBAL_STATE)
+void stratum_close_connection(void)
 {
     extern app_context_t APP_CONTEXT;
     stratum_module_t *strat = &APP_CONTEXT.stratum;
@@ -180,8 +180,7 @@ void stratum_primary_heartbeat(void * pvParameters)
             ESP_LOGI(TAG, "Heartbeat successful and in fallback mode. Switching back to primary.");
             strat->is_using_fallback = false;
             // Close connection to trigger reconnect to primary
-            GlobalState *gs = APP_CONTEXT.legacy;
-            stratum_close_connection(gs);
+            stratum_close_connection();
             continue;
         }
 
@@ -227,7 +226,6 @@ static void decode_mining_notification(stratum_module_t *strat,
 
 void stratum_task(void * pvParameters)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     extern app_context_t APP_CONTEXT;
     stratum_module_t *strat = &APP_CONTEXT.stratum;
 
@@ -356,7 +354,7 @@ void stratum_task(void * pvParameters)
             if (!line) {
                 ESP_LOGE(TAG, "Failed to receive JSON-RPC line, reconnecting...");
                 retry_attempts++;
-                stratum_close_connection(GLOBAL_STATE);
+                stratum_close_connection();
                 break;
             }
 
@@ -398,7 +396,7 @@ void stratum_task(void * pvParameters)
                 strat->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
             } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {
                 ESP_LOGE(TAG, "Pool requested client reconnect...");
-                stratum_close_connection(GLOBAL_STATE);
+                stratum_close_connection();
                 break;
             } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
                 stratum_rtt_record(strat);

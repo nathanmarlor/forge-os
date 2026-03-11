@@ -21,6 +21,8 @@
 #include "esp_psram.h"
 #include "power.h"
 #include "asic.h"
+#include "app_context.h"
+#include "asic_module.h"
 #include "esp_err.h"
 #include "esp_check.h"
 #include "ThermalMonitoring.h"
@@ -361,8 +363,8 @@ void execute_production_test(void * pvParameters)
         tests_done(GLOBAL_STATE, TESTS_FAILED, ASIC_FAILURE);
     }
 
-    uint8_t chips_detected = ASIC_init(GLOBAL_STATE);
-    uint8_t chips_expected = ASIC_get_asic_count(GLOBAL_STATE);
+    uint8_t chips_detected = ASIC_init(GLOBAL_STATE->device_model, GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value);
+    uint8_t chips_expected = ASIC_get_asic_count(GLOBAL_STATE->device_model);
     ESP_LOGI(TAG, "%u chips detected, %u expected", chips_detected, chips_expected);
 
     if (chips_detected != chips_expected) {
@@ -392,7 +394,7 @@ void execute_production_test(void * pvParameters)
     ESP_LOGI(TAG, "Initializing ASIC frequency to %d MHz",
              (int)GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value);
     
-    int baud = ASIC_set_max_baud(GLOBAL_STATE);
+    int baud = ASIC_set_max_baud(GLOBAL_STATE->device_model);
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
     if (SERIAL_set_baud(baud) != ESP_OK) {
@@ -400,13 +402,11 @@ void execute_production_test(void * pvParameters)
         tests_done(GLOBAL_STATE, TESTS_FAILED, ASIC_FAILURE);
     }
 
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = malloc(sizeof(bm_job *) * 128);
-    GLOBAL_STATE->valid_jobs = malloc(sizeof(uint8_t) * 128);
-
-    for (int i = 0; i < 128; i++) {
-        GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[i] = NULL;
-        GLOBAL_STATE->valid_jobs[i] = 0;
-    }
+    // Initialize a local asic module for self-test job tracking
+    extern app_context_t APP_CONTEXT;
+    asic_module_t *test_asic = &APP_CONTEXT.asic;
+    asic_module_init(test_asic, GLOBAL_STATE->asic_job_frequency_ms, GLOBAL_STATE->ASIC_difficulty);
+    asic_module_bridge_legacy(test_asic, GLOBAL_STATE);
 
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 
@@ -450,10 +450,10 @@ void execute_production_test(void * pvParameters)
     bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000);
 
     uint8_t difficulty = 8;
-    ASIC_set_job_difficulty_mask(GLOBAL_STATE, difficulty);
+    ASIC_set_job_difficulty_mask(GLOBAL_STATE->device_model, difficulty);
 
     ESP_LOGI(TAG, "Sending work");
-    ASIC_send_work(GLOBAL_STATE, &job);
+    ASIC_send_work(GLOBAL_STATE->device_model, test_asic, &job);
     
     // Give chips time to receive and start processing work
     ESP_LOGI(TAG, "Waiting for ASICs to start hashing...");
@@ -467,7 +467,7 @@ void execute_production_test(void * pvParameters)
 
     ESP_LOGI(TAG, "Measuring hashrate for 5 seconds...");
     while (duration_ms < hashtest_ms) {
-        task_result * asic_result = ASIC_process_work(GLOBAL_STATE);
+        task_result * asic_result = ASIC_process_work(GLOBAL_STATE->device_model, test_asic);
         if (asic_result != NULL) {
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
@@ -486,8 +486,8 @@ void execute_production_test(void * pvParameters)
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
     // Calculate expected hashrate WITH percentage target built-in
-    uint8_t asic_count = ASIC_get_asic_count(GLOBAL_STATE);
-    uint16_t small_core_count = ASIC_get_small_core_count(GLOBAL_STATE);
+    uint8_t asic_count = ASIC_get_asic_count(GLOBAL_STATE->device_model);
+    uint16_t small_core_count = ASIC_get_small_core_count(GLOBAL_STATE->device_model);
     float frequency_mhz = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
     float hashrate_test_percentage_target = 0.4f;  // 40% for BM1370
     

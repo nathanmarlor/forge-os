@@ -205,19 +205,20 @@ void app_main(void)
 
     SERIAL_init();
 
-    if (ASIC_init(&GLOBAL_STATE) == 0) {
+    if (ASIC_init(APP_CONTEXT.device_model, GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value) == 0) {
         GLOBAL_STATE.SYSTEM_MODULE.asic_status = "Chip count 0";
         ESP_LOGE(TAG, "Chip count 0");
         return;
     }
 
-    SERIAL_set_baud(ASIC_set_max_baud(&GLOBAL_STATE));
+    SERIAL_set_baud(ASIC_set_max_baud(APP_CONTEXT.device_model));
     SERIAL_clear_buffer();
 
     GLOBAL_STATE.ASIC_initalized = true;
+    APP_CONTEXT.asic_initialized = true;
 
     // Initialize stats module (Phase 3) - hashrate, shares, best diff, CPU
-    int asic_count = ASIC_get_asic_count(&GLOBAL_STATE);
+    int asic_count = ASIC_get_asic_count(APP_CONTEXT.device_model);
     if (stats_module_init(&APP_CONTEXT.stats, asic_count, STATS_MAX_HASH_DOMAINS) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init stats module");
         return;
