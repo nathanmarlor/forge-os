@@ -10,7 +10,7 @@ set(EXTRA_COMPONENT_DIRS "../components" "components")
 # - when invoking CMake directly: cmake -D TEST_COMPONENTS="xxxxx" ..
 # - when using idf.py: idf.py -T xxxxx build
 #
-set(TEST_COMPONENTS "bm1366 stratum event_bus stats_testable" CACHE STRING "List of components to test")
+set(TEST_COMPONENTS "bm1366 stratum event_bus stats_testable stratum_testable" CACHE STRING "List of components to test")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 

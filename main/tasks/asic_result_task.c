@@ -13,6 +13,7 @@
 #include "hashrate_monitor_task.h"
 #include "app_context.h"
 #include "stats.h"
+#include "stratum_module.h"
 
 static const char *TAG = "asic_result";
 
@@ -84,7 +85,10 @@ void ASIC_result_task(void *pvParameters)
         if (should_submit)
         {
             char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
-            GLOBAL_STATE->SYSTEM_MODULE.share_submit_timestamp_us = esp_timer_get_time();
+            {
+                extern app_context_t APP_CONTEXT;
+                stratum_rtt_start(&APP_CONTEXT.stratum);
+            }
             int ret = STRATUM_V1_submit_share(
                 GLOBAL_STATE->sock,
                 GLOBAL_STATE->send_uid++,
