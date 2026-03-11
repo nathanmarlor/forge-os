@@ -40,6 +40,7 @@
 #include "theme_api.h"
 #include "http_server.h"
 #include "stats.h"
+#include "power_module.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -680,6 +681,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     extern app_context_t APP_CONTEXT;
     config_module_t *config = &APP_CONTEXT.config;
     stats_module_t *stats = &APP_CONTEXT.stats;
+    power_module_t *pwr = &APP_CONTEXT.power;
 
     char * ssid = config_get_string(config, NVS_CONFIG_WIFI_SSID, CONFIG_ESP_WIFI_SSID);
     char * hostname = config_get_string(config, NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
@@ -698,12 +700,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     get_wifi_current_rssi(&wifi_rssi);
 
     cJSON * root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "power", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.power);
-    cJSON_AddNumberToObject(root, "voltage", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.voltage);
+    cJSON_AddNumberToObject(root, "power", pwr->power);
+    cJSON_AddNumberToObject(root, "voltage", pwr->voltage);
     cJSON_AddNumberToObject(root, "current", Power_get_current(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "vrCurrent", Power_get_vr_current(GLOBAL_STATE));
-    cJSON_AddNumberToObject(root, "temp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg);
-    cJSON_AddNumberToObject(root, "vrTemp", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.vr_temp);
+    cJSON_AddNumberToObject(root, "temp", pwr->chip_temp_avg);
+    cJSON_AddNumberToObject(root, "vrTemp", pwr->vr_temp);
     cJSON_AddNumberToObject(root, "maxPower", Power_get_max_settings(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "nominalVoltage", Power_get_nominal_voltage(GLOBAL_STATE));
     cJSON_AddNumberToObject(root, "hashRate", stats->hashrate);
@@ -796,15 +798,15 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "autofanspeed", config_get_u16(config, NVS_CONFIG_AUTO_FAN_SPEED, 1));
 
-    cJSON_AddNumberToObject(root, "fanspeed", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc);
-    cJSON_AddNumberToObject(root, "fanrpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm[0]);
-    cJSON_AddNumberToObject(root, "fan2rpm", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_rpm[1]);
+    cJSON_AddNumberToObject(root, "fanspeed", pwr->fan_perc);
+    cJSON_AddNumberToObject(root, "fanrpm", pwr->fan_rpm[0]);
+    cJSON_AddNumberToObject(root, "fan2rpm", pwr->fan_rpm[1]);
     cJSON_AddNumberToObject(root, "fanTargetTemp", config_get_u16(config, NVS_CONFIG_FAN_TARGET_TEMP, 45));
     cJSON_AddNumberToObject(root, "fanMinSpeed", config_get_u16(config, NVS_CONFIG_FAN_MIN_SPEED, 35));
     cJSON_AddNumberToObject(root, "blockFound", stats->found_block);
     
-    cJSON_AddNumberToObject(root, "chiptemp1", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp[0]);
-    cJSON_AddNumberToObject(root, "chiptemp2", GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp[1]);
+    cJSON_AddNumberToObject(root, "chiptemp1", pwr->chip_temp[0]);
+    cJSON_AddNumberToObject(root, "chiptemp2", pwr->chip_temp[1]);
     
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
         cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));

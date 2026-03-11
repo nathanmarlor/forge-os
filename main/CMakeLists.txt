@@ -29,12 +29,14 @@ SRCS
     "./power/vcore.c"
     "./modules/config/config.c"
     "./modules/stats/stats.c"
+    "./modules/power/power_module.c"
 
 INCLUDE_DIRS
     "."
     "tasks"
     "modules/config"
     "modules/stats"
+    "modules/power"
     "http_server"
     "self_test"
     "../components/asic/include"

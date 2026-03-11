@@ -19,6 +19,7 @@
 #include "event_bus.h"
 #include "config.h"
 #include "stats.h"
+#include "power_module.h"
 
 typedef struct {
     // ---- Device identity (immutable after boot) ----
@@ -36,6 +37,7 @@ typedef struct {
     // ---- Module instances (Phase 2+) ----
     config_module_t config;
     stats_module_t stats;
+    power_module_t power;
 
     // ---- Legacy bridge ----
     // During migration, modules that haven't been extracted yet
