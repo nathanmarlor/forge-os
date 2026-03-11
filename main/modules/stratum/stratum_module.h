@@ -2,6 +2,7 @@
 #define STRATUM_MODULE_H_
 
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <stdint.h>
 
 #define STRATUM_RTT_SAMPLE_COUNT 100
@@ -41,7 +42,7 @@ typedef struct {
 
     // Connection state
     int sock;
-    int send_uid;
+    atomic_int send_uid;
 
     // Response time tracking
     rtt_tracker_t rtt;

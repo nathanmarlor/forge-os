@@ -186,14 +186,14 @@ static esp_err_t test_reference_voltages(void)
 {
     uint16_t _1V2_voltage = ADC_read(V_1V2_REF, APP_CONTEXT.device_model);
     ESP_LOGI(TAG, "1V2 reference voltage: %u", _1V2_voltage);
-    if (_1V2_voltage < REFERENCE_VOLTAGE_1V2_MIN && _1V2_voltage > REFERENCE_VOLTAGE_1V2_MAX) {
+    if (_1V2_voltage < REFERENCE_VOLTAGE_1V2_MIN || _1V2_voltage > REFERENCE_VOLTAGE_1V2_MAX) {
         ESP_LOGE(TAG, "1V2 reference voltage TEST FAIL, INCORRECT REFERENCE VOLTAGE");
         return ESP_FAIL;
     }
 
     uint16_t _0V8_voltage = ADC_read(V_0V8_REF, APP_CONTEXT.device_model);
     ESP_LOGI(TAG, "0V8 reference voltage: %u", _0V8_voltage);
-    if (_0V8_voltage < REFERENCE_VOLTAGE_0V8_MIN && _0V8_voltage > REFERENCE_VOLTAGE_0V8_MAX) {
+    if (_0V8_voltage < REFERENCE_VOLTAGE_0V8_MIN || _0V8_voltage > REFERENCE_VOLTAGE_0V8_MAX) {
         ESP_LOGE(TAG, "0V8 reference voltage TEST FAIL, INCORRECT REFERENCE VOLTAGE");
         return ESP_FAIL;
     }

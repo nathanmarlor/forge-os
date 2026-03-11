@@ -463,15 +463,10 @@ void BM1370_send_work(asic_module_t *asic, bm_job * next_bm_job)
 
     pthread_mutex_lock(asic->jobs_lock);
     asic->valid_jobs[job.job_id] = 0;
-    pthread_mutex_unlock(asic->jobs_lock);
-
     if (asic->active_jobs[job.job_id] != NULL) {
         free_bm_job(asic->active_jobs[job.job_id]);
     }
-
     asic->active_jobs[job.job_id] = next_bm_job;
-
-    pthread_mutex_lock(asic->jobs_lock);
     asic->valid_jobs[job.job_id] = 1;
     pthread_mutex_unlock(asic->jobs_lock);
 
@@ -518,12 +513,15 @@ task_result * BM1370_process_work(asic_module_t *asic)
     uint32_t version_bits = (ntohs(asic_result.job.version) << 13); // shift the 16 bit value left 13
     ESP_LOGD(TAG, "Job ID: %02X, Core: %d/%d, Ver: %08" PRIX32, job_id, core_id, small_core_id, version_bits);
 
+    pthread_mutex_lock(asic->jobs_lock);
     if (asic->valid_jobs[job_id] == 0) {
+        pthread_mutex_unlock(asic->jobs_lock);
         ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
         return NULL;
     }
 
     uint32_t rolled_version = asic->active_jobs[job_id]->version | version_bits;
+    pthread_mutex_unlock(asic->jobs_lock);
 
     result.job_id = job_id;
     result.nonce = asic_result.job.nonce;
