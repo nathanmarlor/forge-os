@@ -220,7 +220,7 @@ void app_main(void)
 
     xTaskCreate(stratum_task, "stratum admin", 8192, NULL, 5, NULL);
     xTaskCreate(create_jobs_task, "stratum miner", 8192, NULL, 10, NULL);
-    xTaskCreate(ASIC_task, "asic", 8192, (void *) &GLOBAL_STATE, 10, NULL);
+    xTaskCreate(ASIC_task, "asic", 8192, NULL, 10, NULL);
     xTaskCreate(ASIC_result_task, "asic result", 8192, NULL, 15, NULL);
     xTaskCreate(hashrate_monitor_task, "hashrate monitor", 4096, NULL, 5, NULL);
     xTaskCreate(cpu_monitor_task, "cpu monitor", 4096, NULL, 2, NULL);

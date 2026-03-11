@@ -9,7 +9,11 @@ void asic_module_init(asic_module_t *module, double job_interval_ms, uint32_t as
     module->dispatch_semaphore = xSemaphoreCreateBinary();
     module->job_interval_ms = job_interval_ms;
     module->asic_difficulty = asic_difficulty;
-    module->jobs_lock = NULL; // Set by bridge_legacy
+
+    // Initialize the owned mutex and point jobs_lock to it
+    pthread_mutex_init(&module->jobs_mutex, NULL);
+    module->jobs_lock = &module->jobs_mutex;
+
     module->initialized = true;
 }
 
@@ -17,10 +21,8 @@ void asic_module_bridge_legacy(asic_module_t *module, void *global_state)
 {
     GlobalState *gs = (GlobalState *)global_state;
 
-    // Initialize the mutex that lives in GlobalState
+    // Override: use GlobalState's mutex (self_test frees arrays via GlobalState pointers)
     pthread_mutex_init(&gs->valid_jobs_lock, NULL);
-
-    // Module points to GlobalState's mutex (shared, not copied)
     module->jobs_lock = &gs->valid_jobs_lock;
 
     // Alias: GlobalState pointers reference the module's arrays
