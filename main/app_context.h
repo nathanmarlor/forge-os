@@ -79,17 +79,6 @@ typedef struct app_context_t {
     int coinbase_output_count;
     uint64_t coinbase_value_total_satoshis;
 
-    // ---- Legacy bridge ----
-    GlobalState *legacy;
-
 } app_context_t;
-
-/**
- * Set the legacy bridge pointer (for self_test and asic_task bridge).
- */
-static inline void app_context_set_legacy(app_context_t *ctx, GlobalState *gs)
-{
-    ctx->legacy = gs;
-}
 
 #endif /* APP_CONTEXT_H_ */

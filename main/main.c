@@ -27,14 +27,6 @@
 #include "app_context.h"
 #include "event_bus.h"
 
-static GlobalState GLOBAL_STATE = {
-    .extranonce_str = NULL,
-    .extranonce_2_len = 0,
-    .abandon_work = 0,
-    .version_mask = 0,
-    .ASIC_initalized = false
-};
-
 app_context_t APP_CONTEXT;
 
 static const char * TAG = "bitforge";
@@ -123,8 +115,6 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to init event bus");
         return;
     }
-    app_context_set_legacy(&APP_CONTEXT, &GLOBAL_STATE);
-
     // Initialize config module (Phase 2) - loads NVS cache, enables change events
     if (config_init(&APP_CONTEXT.config) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init config module");
@@ -134,8 +124,8 @@ void app_main(void)
     // Optionally hold the boot button
     // bool pressed = gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed <--- Not suppoerted on Nano
     //should we run the self test?
-    if (production_test(&GLOBAL_STATE)){ // || pressed) { // Button not supported
-        execute_production_test((void *) &GLOBAL_STATE);
+    if (production_test()){ // || pressed) { // Button not supported
+        execute_production_test();
         return;
     }
 
