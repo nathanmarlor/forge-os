@@ -37,6 +37,11 @@ typedef struct {
     uint32_t version_mask;
     char *extranonce_str;
     int extranonce_2_len;
+    bool new_version_rolling_msg;
+
+    // Connection state
+    int sock;
+    int send_uid;
 
     // Response time tracking
     rtt_tracker_t rtt;

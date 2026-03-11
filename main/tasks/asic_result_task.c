@@ -5,11 +5,9 @@
 #include "serial.h"
 #include <string.h>
 #include "esp_log.h"
-#include "nvs_config.h"
 #include "utils.h"
 #include "stratum_task.h"
 #include "asic.h"
-#include "hashrate_monitor_task.h"
 #include "app_context.h"
 #include "stats.h"
 #include "stratum_module.h"
@@ -22,6 +20,7 @@ void ASIC_result_task(void *pvParameters)
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
     extern app_context_t APP_CONTEXT;
     asic_module_t *asic = &APP_CONTEXT.asic;
+    stratum_module_t *strat = &APP_CONTEXT.stratum;
 
     while (1)
     {
@@ -83,14 +82,12 @@ void ASIC_result_task(void *pvParameters)
 
         if (should_submit)
         {
-            char *user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback
-                ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user
-                : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
-            stratum_rtt_start(&APP_CONTEXT.stratum);
+            const pool_config_t *pool = stratum_get_active_pool(strat);
+            stratum_rtt_start(strat);
             int ret = STRATUM_V1_submit_share(
-                GLOBAL_STATE->sock,
-                GLOBAL_STATE->send_uid++,
-                user,
+                strat->sock,
+                strat->send_uid++,
+                pool->username,
                 jobid_buf,
                 extranonce2_buf,
                 ntime,
@@ -104,9 +101,6 @@ void ASIC_result_task(void *pvParameters)
         }
 
         // Track best difficulty via stats module
-        {
-            double network_diff = (double)GLOBAL_STATE->network_nonce_diff;
-            stats_check_best_diff(&APP_CONTEXT.stats, nonce_diff, network_diff);
-        }
+        stats_check_best_diff(&APP_CONTEXT.stats, nonce_diff, (double)strat->network_nonce_diff);
     }
 }

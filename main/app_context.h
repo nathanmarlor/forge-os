@@ -22,6 +22,7 @@
 #include "power_module.h"
 #include "stratum_module.h"
 #include "asic_module.h"
+#include "work_queue.h"
 
 typedef struct {
     // ---- Device identity (immutable after boot) ----
@@ -35,8 +36,14 @@ typedef struct {
     uint32_t asic_difficulty;
     double asic_job_frequency_ms;
     bool psram_available;
+    bool asic_initialized;
 
-    // ---- Module instances (Phase 2+) ----
+    // ---- Work queues ----
+    work_queue stratum_queue;
+    work_queue ASIC_jobs_queue;
+    int abandon_work;
+
+    // ---- Module instances ----
     config_module_t config;
     stats_module_t stats;
     power_module_t power;
