@@ -107,13 +107,13 @@ void app_main(void)
         return;
     }
 
-    //parse the NVS config into GLOBAL_STATE
-    if (NVSDevice_parse_config(&GLOBAL_STATE) != ESP_OK) {
+    //parse the NVS config into APP_CONTEXT
+    if (NVSDevice_parse_config(&APP_CONTEXT) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to parse NVS config");
         return;
     }
 
-    if (ASIC_set_device_model(&GLOBAL_STATE) != ESP_OK) {
+    if (ASIC_set_device_model(&APP_CONTEXT) != ESP_OK) {
         ESP_LOGE(TAG, "Error setting ASIC model");
         return;
     }
@@ -123,7 +123,7 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to init event bus");
         return;
     }
-    app_context_init_from_legacy(&APP_CONTEXT, &GLOBAL_STATE);
+    app_context_set_legacy(&APP_CONTEXT, &GLOBAL_STATE);
 
     // Initialize config module (Phase 2) - loads NVS cache, enables change events
     if (config_init(&APP_CONTEXT.config) != ESP_OK) {

@@ -40,7 +40,7 @@ typedef struct {
     bool finished;
 } self_test_state_t;
 
-typedef struct {
+typedef struct app_context_t {
     // ---- Device identity (immutable after boot) ----
     DeviceModel device_model;
     char *device_model_str;
@@ -85,22 +85,10 @@ typedef struct {
 } app_context_t;
 
 /**
- * Initialize the app context from the legacy GlobalState.
- * Copies immutable device info and sets the legacy bridge pointer.
+ * Set the legacy bridge pointer (for self_test and asic_task bridge).
  */
-static inline void app_context_init_from_legacy(app_context_t *ctx, GlobalState *gs)
+static inline void app_context_set_legacy(app_context_t *ctx, GlobalState *gs)
 {
-    ctx->device_model = gs->device_model;
-    ctx->device_model_str = gs->device_model_str;
-    ctx->asic_model = gs->asic_model;
-    ctx->asic_model_str = gs->asic_model_str;
-    ctx->board_version = gs->board_version;
-    ctx->asic_count = 0; // Set after ASIC init
-    ctx->small_core_count = 0;
-    ctx->asic_difficulty = gs->ASIC_difficulty;
-    ctx->asic_job_frequency_ms = gs->asic_job_frequency_ms;
-    ctx->psram_available = gs->psram_is_available;
-    ctx->asic_status = NULL;
     ctx->legacy = gs;
 }
 
