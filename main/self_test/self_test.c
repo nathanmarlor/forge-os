@@ -23,6 +23,7 @@
 #include "asic.h"
 #include "app_context.h"
 #include "asic_module.h"
+#include "config.h"
 #include "esp_err.h"
 #include "esp_check.h"
 #include "ThermalMonitoring.h"
@@ -30,21 +31,21 @@
 
 /*******************************************************************************
  * LED FAILURE DIAGNOSTIC CODES
- * 
+ *
  * After self-test completion, LEDs indicate the test result:
- * 
+ *
  * LED Pattern              | Status            | Cause
  * -------------------------|-------------------|----------------------------------
  * LED1,LED2: ON BLINKING   | PASS              | All tests passed successfully
- * LED1: ON,  LED2: OFF     | PERIPHERAL_FAILURE| PSRAM, Display, Input, or 
+ * LED1: ON,  LED2: OFF     | PERIPHERAL_FAILURE| PSRAM, Display, Input, or
  *                          |                   | Peripheral initialization failed
  * LED1: OFF, LED2: ON      | ASIC_FAILURE      | ASIC detection, hashrate, or
  *                          |                   | reference voltage test failed
  * LED1: ON,  LED2: ON      | POWER_FAILURE     | Voltage regulator or power
  *                          |                   | consumption test failed
- * 
+ *
  * Note: LEDs use active-low logic (GPIO LOW = LED ON, GPIO HIGH = LED OFF)
- * 
+ *
  * To reset after failure: Press and hold button or press RESET
  ******************************************************************************/
 
@@ -77,9 +78,11 @@
 
 static const char * TAG = "self_test";
 
+extern app_context_t APP_CONTEXT;
+
 SemaphoreHandle_t BootSemaphore;
 
-static void tests_done(GlobalState * GLOBAL_STATE, bool test_result,  TEST_FAILED_CAUSE cause);
+static void tests_done(bool test_result, TEST_FAILED_CAUSE cause);
 
 static uint8_t s_led_state = 0;
 static bool initialized = false;
@@ -113,8 +116,8 @@ static void switch_led(int num, uint8_t state)
     }
 }
 
-bool production_test(GlobalState * GLOBAL_STATE) {
-    bool is_max = GLOBAL_STATE->asic_model == ASIC_UNKNOWN;
+bool production_test(void) {
+    bool is_max = APP_CONTEXT.asic_model == ASIC_UNKNOWN;
     uint64_t best_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF, 0);
     uint16_t production_test = nvs_config_get_u16(NVS_CONFIG_PRODUCTION_TEST, 0);
     if (production_test == 1 && !is_max && best_diff < 1) {
@@ -128,18 +131,16 @@ static void reset_self_test() {
     xSemaphoreGive(BootSemaphore);
 }
 
-static void display_msg(char * msg, GlobalState * GLOBAL_STATE)
+static void display_msg(char * msg)
 {
-    GLOBAL_STATE->SELF_TEST_MODULE.message = msg;
-    extern app_context_t APP_CONTEXT;
     APP_CONTEXT.self_test.message = msg;
 }
 
-static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
+static esp_err_t test_fan_sense(void)
 {
     uint16_t fan_speed_1 = 0;
     uint16_t fan_speed_2 = 0;
-    switch (GLOBAL_STATE->device_model) {
+    switch (APP_CONTEXT.device_model) {
         case BITFORGE_NANO:
             fan_speed_1 = Thermal_getFanSpeed();
             fan_speed_2 = 1001;
@@ -180,16 +181,16 @@ static esp_err_t test_TPS546_power_consumption(int target_power, int margin)
     return ESP_FAIL;
 }
 
-static esp_err_t test_reference_voltages(GlobalState * GLOBAL_STATE) 
+static esp_err_t test_reference_voltages(void)
 {
-    uint16_t _1V2_voltage = ADC_read(V_1V2_REF, GLOBAL_STATE->device_model);
-    ESP_LOGI(TAG, "1V2 reference voltage: %u", _1V2_voltage); 
+    uint16_t _1V2_voltage = ADC_read(V_1V2_REF, APP_CONTEXT.device_model);
+    ESP_LOGI(TAG, "1V2 reference voltage: %u", _1V2_voltage);
     if (_1V2_voltage < REFERENCE_VOLTAGE_1V2_MIN && _1V2_voltage > REFERENCE_VOLTAGE_1V2_MAX) {
         ESP_LOGE(TAG, "1V2 reference voltage TEST FAIL, INCORRECT REFERENCE VOLTAGE");
         return ESP_FAIL;
     }
 
-    uint16_t _0V8_voltage = ADC_read(V_0V8_REF, GLOBAL_STATE->device_model);
+    uint16_t _0V8_voltage = ADC_read(V_0V8_REF, APP_CONTEXT.device_model);
     ESP_LOGI(TAG, "0V8 reference voltage: %u", _0V8_voltage);
     if (_0V8_voltage < REFERENCE_VOLTAGE_0V8_MIN && _0V8_voltage > REFERENCE_VOLTAGE_0V8_MAX) {
         ESP_LOGE(TAG, "0V8 reference voltage TEST FAIL, INCORRECT REFERENCE VOLTAGE");
@@ -198,9 +199,9 @@ static esp_err_t test_reference_voltages(GlobalState * GLOBAL_STATE)
     return ESP_OK;
 }
 
-static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
+static esp_err_t test_core_voltage(void)
 {
-    uint16_t core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE->device_model);
+    uint16_t core_voltage = VCORE_get_voltage_mv(APP_CONTEXT.device_model);
     ESP_LOGI(TAG, "Voltage: %u", core_voltage);
 
     if (core_voltage > CORE_VOLTAGE_TARGET_MIN && core_voltage < CORE_VOLTAGE_TARGET_MAX) {
@@ -211,8 +212,8 @@ static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
     return ESP_FAIL;
 }
 
-esp_err_t test_input(GlobalState * GLOBAL_STATE) {
-    switch (GLOBAL_STATE->device_model) {
+esp_err_t test_input(void) {
+    switch (APP_CONTEXT.device_model) {
         case BITFORGE_NANO:
         default:
     }
@@ -220,17 +221,16 @@ esp_err_t test_input(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE) {
-    ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE->device_model), TAG, "VCORE init failed!");
-    //ESP_RETURN_ON_ERROR(VCORE_set_voltage(0U, GLOBAL_STATE), TAG, "VCORE set voltage failed!");
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE->device_model), TAG, "VCORE set voltage failed!");
-    
+esp_err_t init_voltage_regulator(void) {
+    ESP_RETURN_ON_ERROR(VCORE_init(APP_CONTEXT.device_model), TAG, "VCORE init failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, APP_CONTEXT.device_model), TAG, "VCORE set voltage failed!");
+
     return ESP_OK;
 }
 
-esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE) {
+esp_err_t test_vreg_faults(void) {
     uint8_t power_fault = 0;
-    ESP_RETURN_ON_ERROR(VCORE_check_fault(GLOBAL_STATE->device_model, &power_fault), TAG, "VCORE check fault failed!");
+    ESP_RETURN_ON_ERROR(VCORE_check_fault(APP_CONTEXT.device_model, &power_fault), TAG, "VCORE check fault failed!");
 
     if (power_fault) {
         return ESP_FAIL;
@@ -238,21 +238,21 @@ esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
-    
+esp_err_t test_voltage_regulator(void) {
+
     //enable the voltage regulator GPIO on HW that supports it
-    switch (GLOBAL_STATE->device_model) {
+    switch (APP_CONTEXT.device_model) {
         case BITFORGE_NANO:
         default:
     }
 
-    if (init_voltage_regulator(GLOBAL_STATE) != ESP_OK) {
+    if (init_voltage_regulator() != ESP_OK) {
         ESP_LOGE(TAG, "VCORE init failed!");
         return ESP_FAIL;
     }
 
     // VCore regulator testing
-    switch (GLOBAL_STATE->device_model) {
+    switch (APP_CONTEXT.device_model) {
         case BITFORGE_NANO:
             break;
         default:
@@ -262,18 +262,18 @@ esp_err_t test_voltage_regulator(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE) {
-    
+esp_err_t test_init_peripherals(void) {
+
     //Init the EMC2101 fan and temperature monitoring
-    switch (GLOBAL_STATE->device_model) {
+    switch (APP_CONTEXT.device_model) {
         case BITFORGE_NANO:
-            Thermal_init(GLOBAL_STATE->device_model, GLOBAL_STATE->ASIC_initalized);
+            Thermal_init(APP_CONTEXT.device_model, APP_CONTEXT.asic_initialized);
             break;
         default:
     }
 
     //initialize the INA260, if we have one.
-    switch (GLOBAL_STATE->device_model) {
+    switch (APP_CONTEXT.device_model) {
         case BITFORGE_NANO:
             ESP_RETURN_ON_ERROR(INA260_init(), TAG, "INA260 init failed!");
             break;
@@ -284,10 +284,9 @@ esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t test_psram(GlobalState * GLOBAL_STATE){
+esp_err_t test_psram(void){
     if(!esp_psram_is_initialized()) {
         ESP_LOGE(TAG, "No PSRAM available on ESP32!");
-        //display_msg("PSRAM:FAIL", GLOBAL_STATE);
         return ESP_FAIL;
     }
     return ESP_OK;
@@ -296,27 +295,21 @@ esp_err_t test_psram(GlobalState * GLOBAL_STATE){
 /**
  * @brief Perform a self-test of the system.
  *
- * This function is intended to be run as a task and will execute a series of 
+ * This function is intended to be run as a task and will execute a series of
  * diagnostic tests to ensure the system is functioning correctly.
- *
- * @param pvParameters Pointer to the parameters passed to the task (if any).
  */
-void execute_production_test(void * pvParameters)
+void execute_production_test(void)
 {
-    GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
+    uint16_t frequency_value = config_get_u16(&APP_CONTEXT.config, NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
     ESP_LOGI(TAG, "Running Self Tests");
 
     if (configure_led() != ESP_OK) {
         ESP_LOGE(TAG, "LED config failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED, PERIPHERAL_FAILURE);
+        tests_done(TESTS_FAILED, PERIPHERAL_FAILURE);
     }
 
-    GLOBAL_STATE->SELF_TEST_MODULE.active = true;
-    {
-        extern app_context_t APP_CONTEXT;
-        APP_CONTEXT.self_test.active = true;
-    }
+    APP_CONTEXT.self_test.active = true;
 
     // Create a binary semaphore
     BootSemaphore = xSemaphoreCreateBinary();
@@ -329,33 +322,33 @@ void execute_production_test(void * pvParameters)
     }
 
     //Run PSRAM test
-    if(test_psram(GLOBAL_STATE) != ESP_OK) {
+    if(test_psram() != ESP_OK) {
         ESP_LOGE(TAG, "NO PSRAM on device!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED, PERIPHERAL_FAILURE);
+        tests_done(TESTS_FAILED, PERIPHERAL_FAILURE);
     }
 
     //Run input tests
-    if (test_input(GLOBAL_STATE) != ESP_OK) {
+    if (test_input() != ESP_OK) {
         ESP_LOGE(TAG, "Input test failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED, PERIPHERAL_FAILURE);
+        tests_done(TESTS_FAILED, PERIPHERAL_FAILURE);
     }
 
     //Voltage Regulator Testing
-    if (test_voltage_regulator(GLOBAL_STATE) != ESP_OK) {
+    if (test_voltage_regulator() != ESP_OK) {
         ESP_LOGE(TAG, "Voltage Regulator test failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED, POWER_FAILURE);
+        tests_done(TESTS_FAILED, POWER_FAILURE);
     }
 
     //Init peripherals EMC2101 and INA260 (if present)
-    if (test_init_peripherals(GLOBAL_STATE) != ESP_OK) {
+    if (test_init_peripherals() != ESP_OK) {
         ESP_LOGE(TAG, "Peripherals init failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED, PERIPHERAL_FAILURE);
+        tests_done(TESTS_FAILED, PERIPHERAL_FAILURE);
     }
 
-    switch (GLOBAL_STATE->device_model) {
+    switch (APP_CONTEXT.device_model) {
         case BITFORGE_NANO:
-            if (test_reference_voltages(GLOBAL_STATE) != ESP_OK) {
-                tests_done(GLOBAL_STATE, TESTS_FAILED, ASIC_FAILURE);
+            if (test_reference_voltages() != ESP_OK) {
+                tests_done(TESTS_FAILED, ASIC_FAILURE);
             }
             break;
         default:
@@ -366,53 +359,49 @@ void execute_production_test(void * pvParameters)
     //test for number of ASICs
     if (SERIAL_init() != ESP_OK) {
         ESP_LOGE(TAG, "SERIAL init failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED, ASIC_FAILURE);
+        tests_done(TESTS_FAILED, ASIC_FAILURE);
     }
 
-    uint8_t chips_detected = ASIC_init(GLOBAL_STATE->device_model, GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value);
-    uint8_t chips_expected = ASIC_get_asic_count(GLOBAL_STATE->device_model);
+    uint8_t chips_detected = ASIC_init(APP_CONTEXT.device_model, frequency_value);
+    uint8_t chips_expected = ASIC_get_asic_count(APP_CONTEXT.device_model);
     ESP_LOGI(TAG, "%u chips detected, %u expected", chips_detected, chips_expected);
 
     if (chips_detected != chips_expected) {
         ESP_LOGE(TAG, "SELF TEST FAIL, %d of %d CHIPS DETECTED", chips_detected, chips_expected);
         char error_buf[20];
         snprintf(error_buf, 20, "ASIC:FAIL %d CHIPS", chips_detected);
-        tests_done(GLOBAL_STATE, TESTS_FAILED, ASIC_FAILURE);
+        tests_done(TESTS_FAILED, ASIC_FAILURE);
     }
 
     PAC9544_selectChannel(2);
-    float temp_ASIC_1 = Thermal_getAsicChipTemp(GLOBAL_STATE->ASIC_initalized);
+    float temp_ASIC_1 = Thermal_getAsicChipTemp(APP_CONTEXT.asic_initialized);
     ESP_LOGI(TAG, "External Temp of EMC2101_ASIC1: %f", temp_ASIC_1);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     PAC9544_selectChannel(3);
-    float temp_ASIC_2 = Thermal_getAsicChipTemp(GLOBAL_STATE->ASIC_initalized);
+    float temp_ASIC_2 = Thermal_getAsicChipTemp(APP_CONTEXT.asic_initialized);
     ESP_LOGI(TAG, "External Temp of EMC2101_ASIC2: %f", temp_ASIC_2);
 
     //test for voltage regulator faults
-    if (test_vreg_faults(GLOBAL_STATE) != ESP_OK) {
+    if (test_vreg_faults() != ESP_OK) {
         ESP_LOGE(TAG, "VCORE check fault failed!");
         char error_buf[20];
         snprintf(error_buf, 20, "VCORE:PWR FAULT");
-        //display_msg(error_buf, GLOBAL_STATE);
-        tests_done(GLOBAL_STATE, TESTS_FAILED, POWER_FAILURE);
+        tests_done(TESTS_FAILED, POWER_FAILURE);
     }
 
-    ESP_LOGI(TAG, "Initializing ASIC frequency to %d MHz",
-             (int)GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value);
-    
-    int baud = ASIC_set_max_baud(GLOBAL_STATE->device_model);
+    ESP_LOGI(TAG, "Initializing ASIC frequency to %d MHz", (int)frequency_value);
+
+    int baud = ASIC_set_max_baud(APP_CONTEXT.device_model);
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
     if (SERIAL_set_baud(baud) != ESP_OK) {
         ESP_LOGE(TAG, "SERIAL set baud failed!");
-        tests_done(GLOBAL_STATE, TESTS_FAILED, ASIC_FAILURE);
+        tests_done(TESTS_FAILED, ASIC_FAILURE);
     }
 
-    // Initialize a local asic module for self-test job tracking
-    extern app_context_t APP_CONTEXT;
+    // Initialize the asic module for self-test job tracking
     asic_module_t *test_asic = &APP_CONTEXT.asic;
-    asic_module_init(test_asic, GLOBAL_STATE->asic_job_frequency_ms, GLOBAL_STATE->ASIC_difficulty);
-    asic_module_bridge_legacy(test_asic, GLOBAL_STATE);
+    asic_module_init(test_asic, APP_CONTEXT.asic_job_frequency_ms, APP_CONTEXT.asic_difficulty);
 
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 
@@ -456,15 +445,15 @@ void execute_production_test(void * pvParameters)
     bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000);
 
     uint8_t difficulty = 8;
-    ASIC_set_job_difficulty_mask(GLOBAL_STATE->device_model, difficulty);
+    ASIC_set_job_difficulty_mask(APP_CONTEXT.device_model, difficulty);
 
     ESP_LOGI(TAG, "Sending work");
-    ASIC_send_work(GLOBAL_STATE->device_model, test_asic, &job);
-    
+    ASIC_send_work(APP_CONTEXT.device_model, test_asic, &job);
+
     // Give chips time to receive and start processing work
     ESP_LOGI(TAG, "Waiting for ASICs to start hashing...");
     vTaskDelay(500 / portTICK_PERIOD_MS);
-    
+
     uint32_t start_ms = esp_timer_get_time() / 1000;
     uint32_t duration_ms = 0;
     uint32_t counter = 0;
@@ -473,7 +462,7 @@ void execute_production_test(void * pvParameters)
 
     ESP_LOGI(TAG, "Measuring hashrate for 5 seconds...");
     while (duration_ms < hashtest_ms) {
-        task_result * asic_result = ASIC_process_work(GLOBAL_STATE->device_model, test_asic);
+        task_result * asic_result = ASIC_process_work(APP_CONTEXT.device_model, test_asic);
         if (asic_result != NULL) {
             // check the nonce difficulty
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
@@ -492,11 +481,11 @@ void execute_production_test(void * pvParameters)
     vTaskDelay(10 / portTICK_PERIOD_MS);
 
     // Calculate expected hashrate WITH percentage target built-in
-    uint8_t asic_count = ASIC_get_asic_count(GLOBAL_STATE->device_model);
-    uint16_t small_core_count = ASIC_get_small_core_count(GLOBAL_STATE->device_model);
-    float frequency_mhz = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
+    uint8_t asic_count = ASIC_get_asic_count(APP_CONTEXT.device_model);
+    uint16_t small_core_count = ASIC_get_small_core_count(APP_CONTEXT.device_model);
+    float frequency_mhz = (float)frequency_value;
     float hashrate_test_percentage_target = 0.4f;  // 40% for BM1370
-    
+
     float expected_hashrate_ghs = frequency_mhz
                                 * small_core_count
                                 * hashrate_test_percentage_target
@@ -506,45 +495,38 @@ void execute_production_test(void * pvParameters)
     ESP_LOGI(TAG, "Hashrate: %.2f, Expected: %.2f", hashrate, expected_hashrate_ghs);
 
     if (hashrate < expected_hashrate_ghs) {
-        display_msg("HASHRATE:FAIL", GLOBAL_STATE);
-        tests_done(GLOBAL_STATE, TESTS_FAILED, ASIC_FAILURE);
+        display_msg("HASHRATE:FAIL");
+        tests_done(TESTS_FAILED, ASIC_FAILURE);
     }
 
-    free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs);
-    free(GLOBAL_STATE->valid_jobs);
+    // No free() needed - active_jobs/valid_jobs are embedded arrays in asic_module_t
 
-    if (test_core_voltage(GLOBAL_STATE) != ESP_OK) {
-        tests_done(GLOBAL_STATE, TESTS_FAILED, POWER_FAILURE);
+    if (test_core_voltage() != ESP_OK) {
+        tests_done(TESTS_FAILED, POWER_FAILURE);
     }
 
-    switch (GLOBAL_STATE->device_model) {
+    switch (APP_CONTEXT.device_model) {
         case BITFORGE_NANO:
             if (test_INA260_power_consumption(POWER_CONSUMPTION_NANO, POWER_CONSUMPTION_MARGIN) != ESP_OK) {
                 ESP_LOGE(TAG, "INA260 Power Draw Failed, target %.2f", (float)POWER_CONSUMPTION_NANO);
-                tests_done(GLOBAL_STATE, TESTS_FAILED, POWER_FAILURE);
+                tests_done(TESTS_FAILED, POWER_FAILURE);
             }
             break;
         default:
     }
-    tests_done(GLOBAL_STATE, TESTS_PASSED, NO_FAILURE);
+    tests_done(TESTS_PASSED, NO_FAILURE);
 
-    return;  
+    return;
 }
 
-static void tests_done(GlobalState * GLOBAL_STATE, bool test_result, TEST_FAILED_CAUSE cause) 
+static void tests_done(bool test_result, TEST_FAILED_CAUSE cause)
 {
-
-    GLOBAL_STATE->SELF_TEST_MODULE.result = test_result;
-    GLOBAL_STATE->SELF_TEST_MODULE.finished = true;
-    {
-        extern app_context_t APP_CONTEXT;
-        APP_CONTEXT.self_test.result = test_result;
-        APP_CONTEXT.self_test.finished = true;
-    }
-    Power_disable(GLOBAL_STATE->device_model);
+    APP_CONTEXT.self_test.result = test_result;
+    APP_CONTEXT.self_test.finished = true;
+    Power_disable(APP_CONTEXT.device_model);
 
     if (test_result == TESTS_FAILED) {
-        ESP_LOGI(TAG, "SELF TESTS FAIL -- Press RESET to continue");  
+        ESP_LOGI(TAG, "SELF TESTS FAIL -- Press RESET to continue");
 
         switch(cause)
         {
@@ -582,7 +564,7 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool test_result, TEST_FAILED
             switch_led(1, 1);
             switch_led(2, 1);
             vTaskDelay(500 / portTICK_PERIOD_MS);
-            
+
             switch_led(1, 0);
             switch_led(2, 0);
             vTaskDelay(500 / portTICK_PERIOD_MS);

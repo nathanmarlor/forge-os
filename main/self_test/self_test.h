@@ -1,7 +1,7 @@
 #ifndef SELF_TEST_H_
 #define SELF_TEST_H_
 
-#include "global_state.h"
+#include <stdbool.h>
 
 typedef enum test_failed_cause
 {
@@ -11,7 +11,7 @@ typedef enum test_failed_cause
   POWER_FAILURE = 20
 } TEST_FAILED_CAUSE;
 
-void execute_production_test(void * pvParameters);
-bool production_test(GlobalState * GLOBAL_STATE);
+void execute_production_test(void);
+bool production_test(void);
 
 #endif
