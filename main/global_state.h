@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "device_model.h"
 #include "asic_task.h"
 #include "bm1370.h"
 #include "common.h"
@@ -18,18 +19,6 @@
 
 #define HISTORY_LENGTH 100
 #define DIFF_STRING_SIZE 10
-
-typedef enum
-{
-    DEVICE_UNKNOWN = -1,
-    BITFORGE_NANO,
-} DeviceModel;
-
-typedef enum
-{
-    ASIC_UNKNOWN = -1,
-    ASIC_BM1370,
-} AsicModel;
 
 // typedef struct
 // {

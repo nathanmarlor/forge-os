@@ -1,7 +1,6 @@
 #include "esp_log.h"
 #include "bm1370.h"
 #include "hashrate_monitor_task.h"
-#include "global_state.h"
 #include "app_context.h"
 #include "stats.h"
 #include "power_module.h"

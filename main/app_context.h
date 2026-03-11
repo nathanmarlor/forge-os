@@ -7,7 +7,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "global_state.h"
+#include "device_model.h"
+#include "coinbase_decoder.h"
 #include "event_bus.h"
 #include "config.h"
 #include "stats.h"

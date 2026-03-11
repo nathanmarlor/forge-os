@@ -1,4 +1,6 @@
 #include "ThermalMonitoring.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "adc.h"
 #include "PAC9544.h"
 #include "EMC2101.h"

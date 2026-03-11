@@ -13,6 +13,7 @@
 #include "create_jobs_task.h"
 #include "hashrate_monitor_task.h"
 #include "cpu_monitor_task.h"
+#include "power_management_task.h"
 #include "esp_netif.h"
 #include "system.h"
 #include "http_server.h"

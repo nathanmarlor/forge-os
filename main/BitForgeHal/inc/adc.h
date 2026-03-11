@@ -1,7 +1,7 @@
 #ifndef ADC_H_
 #define ADC_H_
 
-#include "global_state.h"
+#include "device_model.h"
 
 typedef enum _Channel
 {

@@ -2,7 +2,7 @@
 #define POWER_H
 
 #include <esp_err.h>
-#include "global_state.h"
+#include "device_model.h"
 
 
 esp_err_t Power_disable(DeviceModel device_model);
