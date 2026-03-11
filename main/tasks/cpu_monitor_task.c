@@ -3,6 +3,8 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "global_state.h"
+#include "app_context.h"
+#include "stats.h"
 
 #if !defined(configUSE_TRACE_FACILITY) || (configUSE_TRACE_FACILITY != 1)
 #error "cpu_monitor_task requires CONFIG_FREERTOS_USE_TRACE_FACILITY=y in sdkconfig"
@@ -15,18 +17,18 @@ static const char *TAG = "cpu_monitor";
 
 void cpu_monitor_task(void *pvParameters)
 {
-    GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
-    SystemModule *module = &GLOBAL_STATE->SYSTEM_MODULE;
+    (void)pvParameters;
+    extern app_context_t APP_CONTEXT;
+    stats_module_t *stats = &APP_CONTEXT.stats;
 
     TaskStatus_t prev_stats[CPU_MONITOR_MAX_TASKS];
     TaskStatus_t curr_stats[CPU_MONITOR_MAX_TASKS];
     uint32_t prev_total = 0;
     uint32_t curr_total = 0;
 
-    // Seed the baseline sample
     UBaseType_t task_count = uxTaskGetSystemState(prev_stats, CPU_MONITOR_MAX_TASKS, &prev_total);
     if (task_count == 0) {
-        ESP_LOGE(TAG, "uxTaskGetSystemState returned 0 — CONFIG_FREERTOS_USE_TRACE_FACILITY not enabled?");
+        ESP_LOGE(TAG, "uxTaskGetSystemState returned 0");
         vTaskDelete(NULL);
         return;
     }
@@ -36,9 +38,7 @@ void cpu_monitor_task(void *pvParameters)
         vTaskDelayUntil(&wake_time, pdMS_TO_TICKS(CPU_MONITOR_POLL_MS));
 
         task_count = uxTaskGetSystemState(curr_stats, CPU_MONITOR_MAX_TASKS, &curr_total);
-        if (task_count == 0) {
-            continue;
-        }
+        if (task_count == 0) continue;
 
         uint32_t total_delta = curr_total - prev_total;
         if (total_delta == 0) {
@@ -64,21 +64,15 @@ void cpu_monitor_task(void *pvParameters)
             }
         }
 
-        // total_delta is wall-clock elapsed time in μs (portGET_RUN_TIME_COUNTER_VALUE
-        // uses esp_timer_get_time() — a single wall-clock value, not per-core).
-        // Each IDLE task accumulates up to total_delta μs of run time on its core.
         float cpu0 = (1.0f - (float)idle0_delta / (float)total_delta) * 100.0f;
         float cpu1 = (1.0f - (float)idle1_delta / (float)total_delta) * 100.0f;
 
-        // Clamp to [0, 100]
         if (cpu0 < 0.0f)   cpu0 = 0.0f;
         if (cpu0 > 100.0f) cpu0 = 100.0f;
         if (cpu1 < 0.0f)   cpu1 = 0.0f;
         if (cpu1 > 100.0f) cpu1 = 100.0f;
 
-        module->cpu0_percent = cpu0;
-        module->cpu1_percent = cpu1;
-
+        stats_update_cpu_load(stats, cpu0, cpu1);
         ESP_LOGD(TAG, "CPU load — Core0: %.1f%%, Core1: %.1f%%", cpu0, cpu1);
 
         memcpy(prev_stats, curr_stats, task_count * sizeof(TaskStatus_t));

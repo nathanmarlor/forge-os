@@ -12,7 +12,6 @@
 #include "esp_log.h"
 #include "esp_check.h"
 
-#include "driver/gpio.h"
 #include "esp_app_desc.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
@@ -24,6 +23,8 @@
 #include "adc.h"
 #include "connect.h"
 #include "nvs_config.h"
+#include "config.h"
+#include "app_context.h"
 #include "display.h"
 #include "input.h"
 #include "vcore.h"
@@ -48,6 +49,9 @@ static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigit
 
 void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 {
+    extern app_context_t APP_CONTEXT;
+    config_module_t *config = &APP_CONTEXT.config;
+
     SystemModule * module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     module->duration_start = 0;
@@ -61,38 +65,31 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->start_time = esp_timer_get_time();
     module->lastClockSync = 0;
     module->FOUND_BLOCK = false;
-    
-    // set the pool url
-    module->pool_url = nvs_config_get_string(NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
-    module->fallback_pool_url = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
 
-    // set the pool port
-    module->pool_port = nvs_config_get_u16(NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT);
-    module->fallback_pool_port = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT);
+    module->pool_url = config_get_string(config, NVS_CONFIG_STRATUM_URL, CONFIG_STRATUM_URL);
+    module->fallback_pool_url = config_get_string(config, NVS_CONFIG_FALLBACK_STRATUM_URL, CONFIG_FALLBACK_STRATUM_URL);
 
-    // set the pool user
-    module->pool_user = nvs_config_get_string(NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
-    module->fallback_pool_user = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
+    module->pool_port = config_get_u16(config, NVS_CONFIG_STRATUM_PORT, CONFIG_STRATUM_PORT);
+    module->fallback_pool_port = config_get_u16(config, NVS_CONFIG_FALLBACK_STRATUM_PORT, CONFIG_FALLBACK_STRATUM_PORT);
 
-    // set the pool password
-    module->pool_pass = nvs_config_get_string(NVS_CONFIG_STRATUM_PASS, CONFIG_STRATUM_PW);
-    module->fallback_pool_pass = nvs_config_get_string(NVS_CONFIG_FALLBACK_STRATUM_PASS, CONFIG_FALLBACK_STRATUM_PW);
+    module->pool_user = config_get_string(config, NVS_CONFIG_STRATUM_USER, CONFIG_STRATUM_USER);
+    module->fallback_pool_user = config_get_string(config, NVS_CONFIG_FALLBACK_STRATUM_USER, CONFIG_FALLBACK_STRATUM_USER);
 
-    // advanced stratum options
-    module->pool_suggested_difficulty = nvs_config_get_u16(NVS_CONFIG_STRATUM_DIFFICULTY, 0);
-    module->fallback_pool_suggested_difficulty = nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, 0);
-    module->pool_extranonce_subscribe = (bool)nvs_config_get_u16(NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, 0);
-    module->fallback_pool_extranonce_subscribe = (bool)nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUB, 0);
-    module->pool_decode_coinbase = (bool)nvs_config_get_u16(NVS_CONFIG_STRATUM_DECODE_COINBASE, 1);
-    module->fallback_pool_decode_coinbase = (bool)nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE, 1);
+    module->pool_pass = config_get_string(config, NVS_CONFIG_STRATUM_PASS, CONFIG_STRATUM_PW);
+    module->fallback_pool_pass = config_get_string(config, NVS_CONFIG_FALLBACK_STRATUM_PASS, CONFIG_FALLBACK_STRATUM_PW);
 
-    // Load pool preference from NVS (default: primary pool)
-    module->is_using_fallback = nvs_config_get_u16(NVS_CONFIG_USE_FALLBACK_STRATUM, 0) != 0;
+    module->pool_suggested_difficulty = config_get_u16(config, NVS_CONFIG_STRATUM_DIFFICULTY, 0);
+    module->fallback_pool_suggested_difficulty = config_get_u16(config, NVS_CONFIG_FALLBACK_STRATUM_DIFFICULTY, 0);
+    module->pool_extranonce_subscribe = (bool)config_get_u16(config, NVS_CONFIG_STRATUM_EXTRANONCE_SUBSCRIBE, 0);
+    module->fallback_pool_extranonce_subscribe = (bool)config_get_u16(config, NVS_CONFIG_FALLBACK_STRATUM_EXTRANONCE_SUB, 0);
+    module->pool_decode_coinbase = (bool)config_get_u16(config, NVS_CONFIG_STRATUM_DECODE_COINBASE, 1);
+    module->fallback_pool_decode_coinbase = (bool)config_get_u16(config, NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE, 1);
+
+    module->is_using_fallback = config_get_u16(config, NVS_CONFIG_USE_FALLBACK_STRATUM, 0) != 0;
     module->response_time = 0.0f;
     module->share_submit_timestamp_us = 0;
 
-    // Initialize overheat_mode
-    module->overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+    module->overheat_mode = config_get_u16(config, NVS_CONFIG_OVERHEAT_MODE, 0);
     ESP_LOGI(TAG, "Initial overheat_mode value: %d", module->overheat_mode);
 
     module->cpu0_percent = 0.0f;
@@ -145,9 +142,12 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     ESP_RETURN_ON_ERROR(gpio_install_isr_service(0), TAG, "Error installing ISR service");
     ESP_RETURN_ON_ERROR(configure_led(), TAG, "LED config failed!");
 
+    extern app_context_t APP_CONTEXT;
+    config_module_t *config = &APP_CONTEXT.config;
+
     // Initialize the core voltage regulator
     ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE), TAG, "VCORE set voltage failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(config_get_u16(config, NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE), TAG, "VCORE set voltage failed!");
     ESP_RETURN_ON_ERROR(Thermal_init(GLOBAL_STATE), TAG, "Thermal init failed!");
     ESP_RETURN_ON_ERROR(VCORE_set_voltage(0U, GLOBAL_STATE), TAG, "VCORE set voltage failed!");
     vTaskDelay(500 / portTICK_PERIOD_MS);
@@ -387,14 +387,15 @@ static void _suffix_string(uint64_t val, char * buf, size_t bufsiz, int sigdigit
 }
 
 static esp_err_t ensure_overheat_mode_config() {
-    uint16_t overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, UINT16_MAX);
+    extern app_context_t APP_CONTEXT;
+    config_module_t *config = &APP_CONTEXT.config;
+
+    uint16_t overheat_mode = config_get_u16(config, NVS_CONFIG_OVERHEAT_MODE, UINT16_MAX);
 
     if (overheat_mode == UINT16_MAX) {
-        // Key doesn't exist or couldn't be read, set the default value
-        nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
+        config_set_u16(config, NVS_CONFIG_OVERHEAT_MODE, 0);
         ESP_LOGI(TAG, "Default value for overheat_mode set to 0");
     } else {
-        // Key exists, log the current value
         ESP_LOGI(TAG, "Existing overheat_mode value: %d", overheat_mode);
     }
 

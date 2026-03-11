@@ -2,9 +2,9 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "nvs_config.h"
+#include "config.h"
+#include "app_context.h"
 #include "cJSON.h"
-
-//static const char *TAG = "theme_api";
 
 // Helper function to set CORS headers
 static esp_err_t set_cors_headers(httpd_req_t *req)
@@ -29,9 +29,12 @@ static esp_err_t theme_get_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     set_cors_headers(req);
 
-    char *scheme = nvs_config_get_string(NVS_CONFIG_THEME_SCHEME, "dark");
-    char *name = nvs_config_get_string(NVS_CONFIG_THEME_NAME, "dark");
-    char *colors = nvs_config_get_string(NVS_CONFIG_THEME_COLORS, 
+    extern app_context_t APP_CONTEXT;
+    config_module_t *config = &APP_CONTEXT.config;
+
+    char *scheme = config_get_string(config, NVS_CONFIG_THEME_SCHEME, "dark");
+    char *name = config_get_string(config, NVS_CONFIG_THEME_NAME, "dark");
+    char *colors = config_get_string(config, NVS_CONFIG_THEME_COLORS,
         "{"
         "\"--primary-color\":\"#F80421\","
         "\"--primary-color-text\":\"#ffffff\","
@@ -99,17 +102,19 @@ static esp_err_t theme_post_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    // Update theme settings
+    extern app_context_t APP_CONTEXT;
+    config_module_t *config = &APP_CONTEXT.config;
+
     cJSON *item;
     if ((item = cJSON_GetObjectItem(root, "colorScheme")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_THEME_SCHEME, item->valuestring);
+        config_set_string(config, NVS_CONFIG_THEME_SCHEME, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "theme")) != NULL) {
-        nvs_config_set_string(NVS_CONFIG_THEME_NAME, item->valuestring);
+        config_set_string(config, NVS_CONFIG_THEME_NAME, item->valuestring);
     }
     if ((item = cJSON_GetObjectItem(root, "accentColors")) != NULL) {
         char *colors_str = cJSON_Print(item);
-        nvs_config_set_string(NVS_CONFIG_THEME_COLORS, colors_str);
+        config_set_string(config, NVS_CONFIG_THEME_COLORS, colors_str);
         free(colors_str);
     }
 

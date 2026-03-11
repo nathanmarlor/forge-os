@@ -3,10 +3,14 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 #include "global_state.h"
 #include "math.h"
 #include "mining.h"
 #include "nvs_config.h"
+#include "config.h"
+#include "event_bus.h"
+#include "app_context.h"
 #include "serial.h"
 #include "TPS546.h"
 #include "vcore.h"
@@ -28,20 +32,49 @@
 #define TPS546_THROTTLE_TEMP 105.0
 #define TPS546_MAX_TEMP 145.0
 
+#define CONFIG_EVENT_QUEUE_SIZE 4
+
 static const char * TAG = "power_management";
 
 static bool even = false;
+
+// Drain any pending config change events and apply them to local state.
+// Returns true if any config relevant to power management changed.
+static bool drain_config_events(QueueHandle_t config_queue, config_module_t *config,
+                                uint16_t *core_voltage, uint16_t *asic_frequency)
+{
+    bool changed = false;
+    event_t evt;
+    while (xQueueReceive(config_queue, &evt, 0) == pdTRUE) {
+        const char *key = evt.data.config.key;
+        if (strcmp(key, NVS_CONFIG_ASIC_VOLTAGE) == 0 ||
+            strcmp(key, NVS_CONFIG_ASIC_FREQ) == 0 ||
+            strcmp(key, NVS_CONFIG_AUTO_FAN_SPEED) == 0 ||
+            strcmp(key, NVS_CONFIG_FAN_SPEED) == 0 ||
+            strcmp(key, NVS_CONFIG_FAN_TARGET_TEMP) == 0 ||
+            strcmp(key, NVS_CONFIG_FAN_MIN_SPEED) == 0 ||
+            strcmp(key, NVS_CONFIG_OVERHEAT_MODE) == 0) {
+            changed = true;
+        }
+    }
+    if (changed && config != NULL) {
+        *core_voltage = config_get_u16(config, NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
+        *asic_frequency = config_get_u16(config, NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+    }
+    return changed;
+}
 
 // Set the fan speed between 35% min and 100% max based on ASIC and VR temperatures.
 // Uses the higher of the two temperature-based fan speed requirements.
 // ASIC: 45°C (35%) → 75°C (100%)
 // VR: 65°C (35%) → 90°C (100%)
-static double automatic_fan_speed(float chip_temp, float vr_temp, GlobalState * GLOBAL_STATE)
+static double automatic_fan_speed(float chip_temp, float vr_temp, GlobalState * GLOBAL_STATE,
+                                  config_module_t *config)
 {
-    double min_fan_speed = (double)nvs_config_get_u16(NVS_CONFIG_FAN_MIN_SPEED, 35);
+    double min_fan_speed = (double)config_get_u16(config, NVS_CONFIG_FAN_MIN_SPEED, 35);
 
     // Calculate fan speed based on ASIC temperature
-    double asic_min_temp = (double)nvs_config_get_u16(NVS_CONFIG_FAN_TARGET_TEMP, 45);
+    double asic_min_temp = (double)config_get_u16(config, NVS_CONFIG_FAN_TARGET_TEMP, 45);
     double asic_max_temp = THROTTLE_TEMP; // 75.0°C
     double asic_fan_speed = min_fan_speed;
     
@@ -94,16 +127,34 @@ void POWER_MANAGEMENT_task(void * pvParameters)
     PowerManagementModule * power_management = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
     SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
 
+    // Get config module from app context (stored right after GLOBAL_STATE in memory layout)
+    // During migration, we access it via the extern APP_CONTEXT
+    extern app_context_t APP_CONTEXT;
+    config_module_t *config = &APP_CONTEXT.config;
+
+    // Subscribe to config change events
+    QueueHandle_t config_queue = xQueueCreate(CONFIG_EVENT_QUEUE_SIZE, sizeof(event_t));
+    if (config_queue != NULL) {
+        event_bus_subscribe(EVT_CONFIG_CHANGED, config_queue);
+        ESP_LOGI(TAG, "Subscribed to EVT_CONFIG_CHANGED");
+    }
+
     power_management->frequency_multiplier = 1;
 
-    //int last_frequency_increase = 0;
-    //uint16_t frequency_target = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
-
     vTaskDelay(500 / portTICK_PERIOD_MS);
-    uint16_t last_core_voltage = 0.0;
+    uint16_t last_core_voltage = 0;
     uint16_t last_asic_frequency = power_management->frequency_value;
     
+    // Pre-load config values from cache
+    uint16_t core_voltage = config_get_u16(config, NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
+    uint16_t asic_frequency = config_get_u16(config, NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
+
     while (1) {
+        // Drain any pending config change events (non-blocking)
+        if (config_queue != NULL) {
+            drain_config_events(config_queue, config, &core_voltage, &asic_frequency);
+        }
+
         PAC9544_selectChannel(even + 2U);
         vTaskDelay(pdMS_TO_TICKS(10)); // Allow PAC9544 channel switch to settle
 
@@ -113,9 +164,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         ESP_LOGI(TAG, "POWER: %f", power_management->power);
         #endif
         power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
-        int16_t voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
         #ifdef POWER_DEBUG
-        ESP_LOGI(TAG, "VCORE: %d", voltage);
+        ESP_LOGI(TAG, "VCORE: %d", VCORE_get_voltage_mv(GLOBAL_STATE));
         #endif
 
         power_management->fan_rpm[even] = Thermal_getFanSpeed();
@@ -139,17 +189,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         power_management->chip_temp[0] = temp_ASIC_1;
         power_management->chip_temp[1] = temp_ASIC_2;
 
-        // ASIC Thermal Diode will give bad readings if the ASIC is turned off
-        // if(power_management->voltage < tps546_config.TPS546_INIT_VOUT_MIN){
-        //     goto looper;
-        // }
-
         //overheat mode if the voltage regulator or ASICs are too hot
         // Only trigger overheat if temperatures are valid (> 0) and actually high
         bool asic1_overheat = (power_management->chip_temp[0] > 0.0f && power_management->chip_temp[0] > THROTTLE_TEMP);
         bool asic2_overheat = (power_management->chip_temp[1] > 0.0f && power_management->chip_temp[1] > THROTTLE_TEMP);
         bool vr_overheat = (power_management->vr_temp > TPS546_THROTTLE_TEMP);
-        
+
         if ((vr_overheat || asic1_overheat || asic2_overheat) && (power_management->frequency_value > 50 || power_management->voltage > 1000)) {
             ESP_LOGE(TAG, "OVERHEAT! VR: %fC ASIC1: %fC ASIC2: %fC", power_management->vr_temp, power_management->chip_temp[0], power_management->chip_temp[1]);
             power_management->fan_perc = 100;
@@ -158,19 +203,19 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             // Turn off core voltage
             Power_disable(GLOBAL_STATE);
 
-            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, 1000);
-            nvs_config_set_u16(NVS_CONFIG_ASIC_FREQ, 50);
-            nvs_config_set_u16(NVS_CONFIG_FAN_SPEED, 100);
-            nvs_config_set_u16(NVS_CONFIG_AUTO_FAN_SPEED, 0);
-            nvs_config_set_u16(NVS_CONFIG_OVERHEAT_MODE, 1);
+            config_set_u16(config, NVS_CONFIG_ASIC_VOLTAGE, 1000);
+            config_set_u16(config, NVS_CONFIG_ASIC_FREQ, 50);
+            config_set_u16(config, NVS_CONFIG_FAN_SPEED, 100);
+            config_set_u16(config, NVS_CONFIG_AUTO_FAN_SPEED, 0);
+            config_set_u16(config, NVS_CONFIG_OVERHEAT_MODE, 1);
             exit(EXIT_FAILURE);
         }
 
-        if (nvs_config_get_u16(NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
+        if (config_get_u16(config, NVS_CONFIG_AUTO_FAN_SPEED, 1) == 1) {
             // Use the higher of the two valid ASIC temperatures for fan control
             float temp_for_fan = 0.0f;
             if (power_management->chip_temp[0] > 0.0f && power_management->chip_temp[1] > 0.0f) {
-                temp_for_fan = (power_management->chip_temp[0] > power_management->chip_temp[1]) ? 
+                temp_for_fan = (power_management->chip_temp[0] > power_management->chip_temp[1]) ?
                                power_management->chip_temp[0] : power_management->chip_temp[1];
             } else if (power_management->chip_temp[0] > 0.0f) {
                 temp_for_fan = power_management->chip_temp[0];
@@ -181,17 +226,13 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 temp_for_fan = 50.0f;
             }
 
-            power_management->fan_perc = (float)automatic_fan_speed(temp_for_fan, power_management->vr_temp, GLOBAL_STATE);
+            power_management->fan_perc = (float)automatic_fan_speed(temp_for_fan, power_management->vr_temp, GLOBAL_STATE, config);
 
         } else {
-            float fs = (float) nvs_config_get_u16(NVS_CONFIG_FAN_SPEED, 100);
+            float fs = (float) config_get_u16(config, NVS_CONFIG_FAN_SPEED, 100);
             power_management->fan_perc = fs;
             Thermal_setFanSpeedPercent((float) fs / 100.0);
         }
-
-        // New voltage and frequency adjustment code
-        uint16_t core_voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE);
-        uint16_t asic_frequency = nvs_config_get_u16(NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY);
 
         if (core_voltage != last_core_voltage) {
             ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
@@ -201,19 +242,19 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         if (asic_frequency != last_asic_frequency) {
             ESP_LOGI(TAG, "New ASIC frequency requested: %uMHz (current: %uMHz)", asic_frequency, last_asic_frequency);
-            
+
             bool success = ASIC_set_frequency(GLOBAL_STATE, (float)asic_frequency);
-            
+
             if (success) {
                 power_management->frequency_value = (float)asic_frequency;
             }
-            
+
             last_asic_frequency = asic_frequency;
         }
 
         // Check for changing of overheat mode
-        uint16_t new_overheat_mode = nvs_config_get_u16(NVS_CONFIG_OVERHEAT_MODE, 0);
-        
+        uint16_t new_overheat_mode = config_get_u16(config, NVS_CONFIG_OVERHEAT_MODE, 0);
+
         if (new_overheat_mode != sys_module->overheat_mode) {
             sys_module->overheat_mode = new_overheat_mode;
             ESP_LOGI(TAG, "Overheat mode updated to: %d", sys_module->overheat_mode);
@@ -221,7 +262,6 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         VCORE_check_fault(GLOBAL_STATE);
         even = !even;
-        // looper:
         vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);
     }
 }

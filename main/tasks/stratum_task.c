@@ -13,6 +13,8 @@
 #include <esp_sntp.h>
 #include <time.h>
 #include "coinbase_decoder.h"
+#include "app_context.h"
+#include "stats.h"
 
 #define PORT CONFIG_STRATUM_PORT
 #define STRATUM_URL CONFIG_STRATUM_URL
@@ -431,10 +433,13 @@ void stratum_task(void * pvParameters)
                 }
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "message result accepted");
+                    extern app_context_t APP_CONTEXT;
+                    stats_notify_accepted_share(&APP_CONTEXT.stats);
                     SYSTEM_notify_accepted_share(GLOBAL_STATE);
                 } else {
                     ESP_LOGW(TAG, "message result rejected: %s", stratum_api_v1_message.error_str);
-                    SYSTEM_notify_rejected_share(GLOBAL_STATE, stratum_api_v1_message.error_str);
+                    extern app_context_t APP_CONTEXT;
+                    stats_notify_rejected_share(&APP_CONTEXT.stats, stratum_api_v1_message.error_str);
                 }
             } else if (stratum_api_v1_message.method == STRATUM_RESULT_SETUP) {
                 // Reset retry attempts after successfully receiving data.

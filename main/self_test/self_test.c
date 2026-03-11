@@ -13,6 +13,7 @@
 #include "nvs_config.h"
 #include "nvs_flash.h"
 #include "display.h"
+#include "stats.h"
 #include "input.h"
 #include "vcore.h"
 #include "utils.h"
@@ -471,7 +472,7 @@ void execute_production_test(void * pvParameters)
             double nonce_diff = test_nonce_value(&job, asic_result->nonce, asic_result->rolled_version);
             counter += 8;  // DIFFICULTY = 8 (matches ESP-Miner-WantClue)
             duration_ms = (esp_timer_get_time() / 1000) - start_ms;
-            hashrate = hash_counter_to_ghs(duration_ms, counter);
+            hashrate = stats_hash_counter_to_ghs(duration_ms, counter);
 
             // Log every 50 nonces to avoid watchdog
             if ((counter / 8) % 50 == 0) {

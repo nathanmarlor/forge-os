@@ -17,6 +17,8 @@
 #include <stdint.h>
 #include "global_state.h"
 #include "event_bus.h"
+#include "config.h"
+#include "stats.h"
 
 typedef struct {
     // ---- Device identity (immutable after boot) ----
@@ -30,6 +32,10 @@ typedef struct {
     uint32_t asic_difficulty;
     double asic_job_frequency_ms;
     bool psram_available;
+
+    // ---- Module instances (Phase 2+) ----
+    config_module_t config;
+    stats_module_t stats;
 
     // ---- Legacy bridge ----
     // During migration, modules that haven't been extracted yet

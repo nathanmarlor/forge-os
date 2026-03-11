@@ -35,7 +35,7 @@ static GlobalState GLOBAL_STATE = {
     .ASIC_initalized = false
 };
 
-static app_context_t APP_CONTEXT;
+app_context_t APP_CONTEXT;
 
 static const char * TAG = "bitforge";
 
@@ -125,6 +125,12 @@ void app_main(void)
     }
     app_context_init_from_legacy(&APP_CONTEXT, &GLOBAL_STATE);
 
+    // Initialize config module (Phase 2) - loads NVS cache, enables change events
+    if (config_init(&APP_CONTEXT.config) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init config module");
+        return;
+    }
+
     // Optionally hold the boot button
     // bool pressed = gpio_get_level(CONFIG_GPIO_BUTTON_BOOT) == 0; // LOW when pressed <--- Not suppoerted on Nano
     //should we run the self test?
@@ -135,10 +141,9 @@ void app_main(void)
 
     SYSTEM_init_system(&GLOBAL_STATE);
 
-    // pull the wifi credentials and hostname out of NVS
-    char * wifi_ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID, WIFI_SSID);
-    char * wifi_pass = nvs_config_get_string(NVS_CONFIG_WIFI_PASS, WIFI_PASS);
-    char * hostname  = nvs_config_get_string(NVS_CONFIG_HOSTNAME, HOSTNAME);
+    char * wifi_ssid = config_get_string(&APP_CONTEXT.config, NVS_CONFIG_WIFI_SSID, WIFI_SSID);
+    char * wifi_pass = config_get_string(&APP_CONTEXT.config, NVS_CONFIG_WIFI_PASS, WIFI_PASS);
+    char * hostname  = config_get_string(&APP_CONTEXT.config, NVS_CONFIG_HOSTNAME, HOSTNAME);
 
     // copy the wifi ssid to the global state
     strncpy(GLOBAL_STATE.SYSTEM_MODULE.ssid, wifi_ssid, sizeof(GLOBAL_STATE.SYSTEM_MODULE.ssid));
@@ -207,6 +212,13 @@ void app_main(void)
     SERIAL_clear_buffer();
 
     GLOBAL_STATE.ASIC_initalized = true;
+
+    // Initialize stats module (Phase 3) - hashrate, shares, best diff, CPU
+    int asic_count = ASIC_get_asic_count(&GLOBAL_STATE);
+    if (stats_module_init(&APP_CONTEXT.stats, asic_count, STATS_MAX_HASH_DOMAINS) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init stats module");
+        return;
+    }
 
     xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL);
     xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 10, NULL);

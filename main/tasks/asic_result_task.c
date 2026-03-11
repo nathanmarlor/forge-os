@@ -11,6 +11,8 @@
 #include "stratum_task.h"
 #include "asic.h"
 #include "hashrate_monitor_task.h"
+#include "app_context.h"
+#include "stats.h"
 
 static const char *TAG = "asic_result";
 
@@ -33,12 +35,9 @@ void ASIC_result_task(void *pvParameters)
         {
             ESP_LOGD(TAG, "Register response detected: type=%d, asic=%d, value=0x%08X",
                      asic_result->register_type, asic_result->asic_nr, asic_result->value);
-            // Call hashrate monitor callback
-            if (GLOBAL_STATE->HASHRATE_MONITOR_MODULE.is_initialized)
-            {
-                hashrate_monitor_register_read(GLOBAL_STATE, asic_result->register_type, asic_result->asic_nr, asic_result->value);
-            } else {
-                ESP_LOGW(TAG, "Hashrate monitor not initialized yet");
+            extern app_context_t APP_CONTEXT;
+            if (APP_CONTEXT.stats.hashrate_initialized) {
+                stats_handle_register_read(&APP_CONTEXT.stats, asic_result->register_type, asic_result->asic_nr, asic_result->value);
             }
             continue;
         }
@@ -102,6 +101,11 @@ void ASIC_result_task(void *pvParameters)
             }
         }
 
-        SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_diff, job_id);
+        // Track best difficulty via stats module
+        {
+            extern app_context_t APP_CONTEXT;
+            double network_diff = (double)GLOBAL_STATE->network_nonce_diff;
+            stats_check_best_diff(&APP_CONTEXT.stats, nonce_diff, network_diff);
+        }
     }
 }
