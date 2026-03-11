@@ -5,6 +5,7 @@
 #include "bm1370.h"
 
 #include "asic.h"
+#include "app_context.h"
 
 static const char *TAG = "asic";
 
@@ -110,25 +111,24 @@ bool ASIC_set_frequency(AsicModel asic_model, float target_frequency) {
     return success;
 }
 
-esp_err_t ASIC_set_device_model(GlobalState * GLOBAL_STATE) {
+esp_err_t ASIC_set_device_model(app_context_t *ctx) {
 
-    if (GLOBAL_STATE->device_model_str == NULL) {
+    if (ctx->device_model_str == NULL) {
         ESP_LOGE(TAG, "No device model string found");
         return ESP_FAIL;
     }
 
-    if (strcmp(GLOBAL_STATE->device_model_str, "BITFORGE_NANO") == 0) {
-        GLOBAL_STATE->asic_model = ASIC_BM1370;
-        //GLOBAL_STATE.asic_job_frequency_ms = (NONCE_SPACE / (double) (GLOBAL_STATE.POWER_MANAGEMENT_MODULE.frequency_value * BM1370_CORE_COUNT * 1000)) / (double) BITAXE_GAMMA_ASIC_COUNT; // version-rolling so Small Cores have different Nonce Space
-        GLOBAL_STATE->asic_job_frequency_ms = 500; //ms
-        GLOBAL_STATE->ASIC_difficulty = BM1370_ASIC_DIFFICULTY;
+    if (strcmp(ctx->device_model_str, "BITFORGE_NANO") == 0) {
+        ctx->asic_model = ASIC_BM1370;
+        ctx->asic_job_frequency_ms = 500; //ms
+        ctx->asic_difficulty = BM1370_ASIC_DIFFICULTY;
         ESP_LOGI(TAG, "DEVICE: BitForgeNano");
         ESP_LOGI(TAG, "ASIC: %dx BM1370 (%" PRIu64 " cores)", BITFORGE_NANO_ASIC_COUNT, BM1370_CORE_COUNT);
-        GLOBAL_STATE->device_model = BITFORGE_NANO;
+        ctx->device_model = BITFORGE_NANO;
 
     } else {
         ESP_LOGE(TAG, "Invalid DEVICE model");
-        GLOBAL_STATE->device_model = DEVICE_UNKNOWN;
+        ctx->device_model = DEVICE_UNKNOWN;
         return ESP_FAIL;
     }
     return ESP_OK;

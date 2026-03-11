@@ -16,6 +16,7 @@ REQUIRES
     "esp_driver_gpio"
     "esp_driver_uart"
     "stratum"
+    "event_bus"
 )
 
 
@@ -27,3 +28,7 @@ target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}
 
 # Include module headers
 target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../main/modules/asic")
+target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../main/modules/config")
+target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../main/modules/stats")
+target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../main/modules/power")
+target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../main/modules/stratum")
