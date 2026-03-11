@@ -6,6 +6,7 @@
  */
 
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include "device_model.h"
 #include "coinbase_decoder.h"
@@ -58,7 +59,7 @@ typedef struct app_context_t {
     // ---- Work queues ----
     work_queue stratum_queue;
     work_queue ASIC_jobs_queue;
-    int abandon_work;
+    volatile int abandon_work;
 
     // ---- Module instances ----
     config_module_t config;

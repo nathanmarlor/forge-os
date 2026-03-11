@@ -55,9 +55,7 @@ static void clean_queue(app_context_t *ctx)
 
     pthread_mutex_lock(ctx->asic.jobs_lock);
     ASIC_jobs_queue_clear(&ctx->ASIC_jobs_queue);
-    for (int i = 0; i < ASIC_JOB_SLOTS; i += 4) {
-        ctx->asic.valid_jobs[i] = 0;
-    }
+    memset(ctx->asic.valid_jobs, 0, sizeof(ctx->asic.valid_jobs));
     pthread_mutex_unlock(ctx->asic.jobs_lock);
 }
 
