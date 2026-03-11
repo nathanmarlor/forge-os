@@ -25,6 +25,7 @@
 #include "nvs_config.h"
 #include "config.h"
 #include "app_context.h"
+#include "stratum_module.h"
 #include "display.h"
 #include "input.h"
 #include "vcore.h"
@@ -107,6 +108,28 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
 
     // set the wifi_status to blank
     memset(module->wifi_status, 0, 20);
+
+    // Initialize stratum module (Phase 5)
+    pool_config_t primary_pool = {
+        .url = module->pool_url,
+        .port = module->pool_port,
+        .username = module->pool_user,
+        .password = module->pool_pass,
+        .suggested_difficulty = module->pool_suggested_difficulty,
+        .extranonce_subscribe = module->pool_extranonce_subscribe,
+        .decode_coinbase = module->pool_decode_coinbase,
+    };
+    pool_config_t fallback_pool = {
+        .url = module->fallback_pool_url,
+        .port = module->fallback_pool_port,
+        .username = module->fallback_pool_user,
+        .password = module->fallback_pool_pass,
+        .suggested_difficulty = module->fallback_pool_suggested_difficulty,
+        .extranonce_subscribe = module->fallback_pool_extranonce_subscribe,
+        .decode_coinbase = module->fallback_pool_decode_coinbase,
+    };
+    stratum_module_init(&APP_CONTEXT.stratum, &primary_pool, &fallback_pool);
+    APP_CONTEXT.stratum.is_using_fallback = module->is_using_fallback;
 }
 
 static void led_timer_callback(TimerHandle_t xTimer)

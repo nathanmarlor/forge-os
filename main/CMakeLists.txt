@@ -30,6 +30,7 @@ SRCS
     "./modules/config/config.c"
     "./modules/stats/stats.c"
     "./modules/power/power_module.c"
+    "./modules/stratum/stratum_module.c"
 
 INCLUDE_DIRS
     "."
@@ -37,6 +38,7 @@ INCLUDE_DIRS
     "modules/config"
     "modules/stats"
     "modules/power"
+    "modules/stratum"
     "http_server"
     "self_test"
     "../components/asic/include"
