@@ -43,15 +43,29 @@ void create_jobs_task(void *pvParameters)
         {
             if (APP_CONTEXT.ASIC_jobs_queue.count < QUEUE_LOW_WATER_MARK)
             {
-                char *extranonce_2_str = extranonce_2_generate(extranonce_2, strat->extranonce_2_len);
+                // Copy extranonce under lock to avoid race with stratum_task
+                pthread_mutex_lock(&strat->connection_lock);
+                char *extranonce_copy = strat->extranonce_str ? strdup(strat->extranonce_str) : NULL;
+                int extranonce_2_len = strat->extranonce_2_len;
+                pthread_mutex_unlock(&strat->connection_lock);
+
+                if (extranonce_copy == NULL) {
+                    ESP_LOGE(TAG, "extranonce_str not set yet, waiting...");
+                    vTaskDelay(100 / portTICK_PERIOD_MS);
+                    continue;
+                }
+
+                char *extranonce_2_str = extranonce_2_generate(extranonce_2, extranonce_2_len);
                 if (extranonce_2_str == NULL) {
                     ESP_LOGE(TAG, "Failed to generate extranonce_2");
+                    free(extranonce_copy);
                     break;
                 }
 
                 char *coinbase_tx = construct_coinbase_tx(
                     mining_notification->coinbase_1, mining_notification->coinbase_2,
-                    strat->extranonce_str, extranonce_2_str);
+                    extranonce_copy, extranonce_2_str);
+                free(extranonce_copy);
                 if (coinbase_tx == NULL) {
                     ESP_LOGE(TAG, "Failed to construct coinbase_tx");
                     free(extranonce_2_str);

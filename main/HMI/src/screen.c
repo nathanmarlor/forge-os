@@ -257,7 +257,9 @@ static void screen_update_cb(lv_timer_t * timer)
 
         screen_show(SCR_SELF_TEST);
 
-        lv_label_set_text(self_test_message_label, self_test->message);
+        if (self_test->message != NULL) {
+            lv_label_set_text(self_test_message_label, self_test->message);
+        }
 
         if (self_test->finished) {
             if (self_test->result) {

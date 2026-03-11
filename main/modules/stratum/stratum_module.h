@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdatomic.h>
 #include <stdint.h>
+#include <pthread.h>
 
 #define STRATUM_RTT_SAMPLE_COUNT 100
 
@@ -43,6 +44,7 @@ typedef struct {
     // Connection state
     int sock;
     atomic_int send_uid;
+    pthread_mutex_t connection_lock;  // Protects sock, extranonce_str
 
     // Response time tracking
     rtt_tracker_t rtt;

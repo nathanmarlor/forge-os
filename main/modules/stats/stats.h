@@ -37,13 +37,14 @@ typedef struct {
     bool hashrate_initialized;
     pthread_mutex_t measurement_lock;
 
-    // ---- Shares ----
+    // ---- Shares (protected by share_lock) ----
     uint64_t shares_accepted;
     uint64_t shares_rejected;
     rejected_reason_stat_t rejected_reasons[STATS_MAX_REJECTION_REASONS];
     int rejected_reason_count;
+    pthread_mutex_t share_lock;
 
-    // ---- Best difficulty ----
+    // ---- Best difficulty (protected by share_lock) ----
     uint64_t best_nonce_diff;
     char best_diff_string[STATS_DIFF_STRING_SIZE];
     uint64_t best_session_nonce_diff;

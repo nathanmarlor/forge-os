@@ -113,6 +113,7 @@ esp_err_t config_init(config_module_t *module)
         }
     }
 
+    pthread_mutex_init(&module->lock, NULL);
     module->initialized = true;
     ESP_LOGI(TAG, "Config module initialized (%zu cached keys)", CACHE_MAP_SIZE);
     return ESP_OK;
@@ -139,6 +140,8 @@ esp_err_t config_set_u16(config_module_t *module, const char *key, uint16_t valu
         return ESP_ERR_INVALID_ARG;
     }
 
+    pthread_mutex_lock(&module->lock);
+
     // Check if value actually changed (from cache or NVS)
     uint16_t old_value;
     uint16_t *cached = find_cache_field(module, key);
@@ -156,7 +159,9 @@ esp_err_t config_set_u16(config_module_t *module, const char *key, uint16_t valu
         *cached = value;
     }
 
-    // Publish change event only if value changed
+    pthread_mutex_unlock(&module->lock);
+
+    // Publish change event only if value changed (outside lock, event bus has its own sync)
     if (old_value != value) {
         ESP_LOGD(TAG, "Config changed: %s = %u (was %u)", key, value, old_value);
         publish_config_changed(key, (uint32_t)value);

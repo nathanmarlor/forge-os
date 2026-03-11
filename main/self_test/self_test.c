@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
 #include "driver/gpio.h"
@@ -444,6 +445,7 @@ void execute_production_test(void)
     char * merkle_root = calculate_merkle_root_hash(coinbase_tx, merkles, num_merkles);
 
     bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000);
+    free(merkle_root);
 
     uint8_t difficulty = 8;
     ASIC_set_job_difficulty_mask(APP_CONTEXT.device_model, difficulty);

@@ -10,7 +10,7 @@
 #endif
 
 #define CPU_MONITOR_POLL_MS   5000
-#define CPU_MONITOR_MAX_TASKS 32
+#define CPU_MONITOR_MAX_TASKS 48
 
 static const char *TAG = "cpu_monitor";
 

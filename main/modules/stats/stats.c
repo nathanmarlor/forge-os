@@ -131,6 +131,7 @@ esp_err_t stats_module_init(stats_module_t *stats, int asic_count, int hash_doma
     }
 
     pthread_mutex_init(&stats->measurement_lock, NULL);
+    pthread_mutex_init(&stats->share_lock, NULL);
     clear_measurements(stats);
 
     // Load persisted best difficulty from NVS
@@ -208,11 +209,14 @@ void stats_compute_hashrate(stats_module_t *stats)
 
 void stats_notify_accepted_share(stats_module_t *stats)
 {
+    pthread_mutex_lock(&stats->share_lock);
     stats->shares_accepted++;
+    pthread_mutex_unlock(&stats->share_lock);
 }
 
 void stats_notify_rejected_share(stats_module_t *stats, const char *error_msg)
 {
+    pthread_mutex_lock(&stats->share_lock);
     stats->shares_rejected++;
 
     // Try to find existing reason
@@ -220,6 +224,7 @@ void stats_notify_rejected_share(stats_module_t *stats, const char *error_msg)
         if (strncmp(stats->rejected_reasons[i].message, error_msg,
                     sizeof(stats->rejected_reasons[i].message) - 1) == 0) {
             stats->rejected_reasons[i].count++;
+            pthread_mutex_unlock(&stats->share_lock);
             return;
         }
     }
@@ -239,11 +244,14 @@ void stats_notify_rejected_share(stats_module_t *stats, const char *error_msg)
         qsort(stats->rejected_reasons, stats->rejected_reason_count,
               sizeof(stats->rejected_reasons[0]), compare_rejected_reasons);
     }
+    pthread_mutex_unlock(&stats->share_lock);
 }
 
 void stats_check_best_diff(stats_module_t *stats, double nonce_diff, double network_diff)
 {
     uint64_t diff = (uint64_t)nonce_diff;
+
+    pthread_mutex_lock(&stats->share_lock);
 
     if (diff > stats->best_session_nonce_diff) {
         stats->best_session_nonce_diff = diff;
@@ -252,8 +260,12 @@ void stats_check_best_diff(stats_module_t *stats, double nonce_diff, double netw
 
     if (diff > stats->best_nonce_diff) {
         stats->best_nonce_diff = diff;
-        nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, stats->best_nonce_diff);
         stats_format_diff_string(diff, stats->best_diff_string, STATS_DIFF_STRING_SIZE);
+        pthread_mutex_unlock(&stats->share_lock);
+        // NVS write outside lock (slow operation)
+        nvs_config_set_u64(NVS_CONFIG_BEST_DIFF, diff);
+    } else {
+        pthread_mutex_unlock(&stats->share_lock);
     }
 
     if (nonce_diff > network_diff) {

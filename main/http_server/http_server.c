@@ -1029,6 +1029,7 @@ esp_err_t POST_OTA_update(httpd_req_t * req)
             esp_ota_abort(ota_handle);
             snprintf(APP_CONTEXT.ota.status, 20, "Write Error");
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Write Error");
+            APP_CONTEXT.ota.is_updating = false;
             return ESP_OK;
         }
 
