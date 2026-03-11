@@ -10,16 +10,15 @@ static DeviceModel _deviceModel;
 static const char *TAG = "ThermalMonitoring";
 
 
-esp_err_t Thermal_init(GlobalState * GLOBAL_STATE) {
+esp_err_t Thermal_init(DeviceModel device_model, bool asic_initialized) {
 
     esp_err_t result = ESP_OK;
-    _deviceModel = GLOBAL_STATE->device_model;
-    float temp = 0U;
+    _deviceModel = device_model;
 
     switch (_deviceModel) {
         case BITFORGE_NANO:
             PAC9544_init();
-            
+
             // First EMC2101
             PAC9544_selectChannel(2);
             vTaskDelay(pdMS_TO_TICKS(10)); // Allow PAC9544 channel switch to settle
@@ -27,7 +26,7 @@ esp_err_t Thermal_init(GlobalState * GLOBAL_STATE) {
             EMC2101_setIdealityFactor(EMC2101_IDEALITY_1_0566);
             EMC2101_setBetaCompensation(EMC2101_BETA_11);
             // Initial fan speed will be set by power management task
-            float temp_ASIC_1 = Thermal_getAsicChipTemp(GLOBAL_STATE);
+            float temp_ASIC_1 = Thermal_getAsicChipTemp(asic_initialized);
             #ifdef DEBUG_THERMALMONITORING
             ESP_LOGI(TAG, "External Temp of EMC2101_ASIC1: %f", temp_ASIC_1);
             #endif
@@ -43,7 +42,7 @@ esp_err_t Thermal_init(GlobalState * GLOBAL_STATE) {
             EMC2101_setIdealityFactor(EMC2101_IDEALITY_1_0566);
             EMC2101_setBetaCompensation(EMC2101_BETA_11);
             // Initial fan speed will be set by power management task
-            float temp_ASIC_2 = Thermal_getAsicChipTemp(GLOBAL_STATE);
+            float temp_ASIC_2 = Thermal_getAsicChipTemp(asic_initialized);
             #ifdef DEBUG_THERMALMONITORING
             ESP_LOGI(TAG, "External Temp of EMC2101_ASIC2: %f", temp_ASIC_2);
             #endif
@@ -67,7 +66,7 @@ esp_err_t Thermal_setFanSpeedPercent(float percent)
             PAC9544_selectChannel(2);
             vTaskDelay(pdMS_TO_TICKS(10)); // Allow PAC9544 channel switch to settle
             EMC2101_setFanSpeed(percent);
-            
+
             // Set fan speed on second EMC2101 (channel 3)
             PAC9544_selectChannel(3);
             vTaskDelay(pdMS_TO_TICKS(10)); // Allow PAC9544 channel switch to settle
@@ -92,12 +91,12 @@ uint16_t Thermal_getFanSpeed(void)
     }
 }
 
-float Thermal_getAsicChipTemp(GlobalState * GLOBAL_STATE)
+float Thermal_getAsicChipTemp(bool asic_initialized)
 {
-    if (!GLOBAL_STATE->ASIC_initalized) {
+    if (!asic_initialized) {
         return -1;
     }
-    
+
     switch (_deviceModel) {
         case BITFORGE_NANO:
             return EMC2101_getExternalTemp();

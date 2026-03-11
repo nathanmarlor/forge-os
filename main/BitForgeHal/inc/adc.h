@@ -13,9 +13,9 @@ typedef enum _Channel
 } ADC_CHANNEL;
 
 
-void ADC_init(GlobalState * GLOBAL_STATE);
+void ADC_init(DeviceModel device_model);
 uint16_t ADC_get_vcore(void);
-uint16_t ADC_read(ADC_CHANNEL Channel, GlobalState * GLOBAL_STATE);
+uint16_t ADC_read(ADC_CHANNEL Channel, DeviceModel device_model);
 float ADC_get_temperature(ADC_CHANNEL Channel, DeviceModel Device);
 
 #endif /* ADC_H_ */

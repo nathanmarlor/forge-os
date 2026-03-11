@@ -159,11 +159,11 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
     GlobalState * GLOBAL_STATE = (GlobalState *) pvParameters;
     PowerManagementModule * legacy_pm = &GLOBAL_STATE->POWER_MANAGEMENT_MODULE;
-    SystemModule * sys_module = &GLOBAL_STATE->SYSTEM_MODULE;
 
     extern app_context_t APP_CONTEXT;
     config_module_t *config = &APP_CONTEXT.config;
     power_module_t *pwr = &APP_CONTEXT.power;
+    DeviceModel dm = APP_CONTEXT.device_model;
 
     // Initialize power module
     power_module_init(pwr);
@@ -193,24 +193,24 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         PAC9544_selectChannel(even + 2U);
         vTaskDelay(pdMS_TO_TICKS(10)); // Allow PAC9544 channel switch to settle
 
-        pwr->voltage = Power_get_input_voltage(GLOBAL_STATE);
-        pwr->power = Power_get_power(GLOBAL_STATE);
+        pwr->voltage = Power_get_input_voltage(dm);
+        pwr->power = Power_get_power(dm);
         #ifdef POWER_DEBUG
         ESP_LOGI(TAG, "POWER: %f", pwr->power);
         #endif
-        pwr->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
+        pwr->vr_temp = Power_get_vreg_temp(dm);
         #ifdef POWER_DEBUG
-        ESP_LOGI(TAG, "VCORE: %d", VCORE_get_voltage_mv(GLOBAL_STATE));
+        ESP_LOGI(TAG, "VCORE: %d", VCORE_get_voltage_mv(dm));
         #endif
 
         pwr->fan_rpm[even] = Thermal_getFanSpeed();
 
         PAC9544_selectChannel(2);
         vTaskDelay(pdMS_TO_TICKS(10));
-        float temp_ASIC_1 = Thermal_getAsicChipTemp(GLOBAL_STATE);
+        float temp_ASIC_1 = Thermal_getAsicChipTemp(APP_CONTEXT.asic_initialized);
         PAC9544_selectChannel(3);
         vTaskDelay(pdMS_TO_TICKS(10));
-        float temp_ASIC_2 = Thermal_getAsicChipTemp(GLOBAL_STATE);
+        float temp_ASIC_2 = Thermal_getAsicChipTemp(APP_CONTEXT.asic_initialized);
 
         pwr->chip_temp_avg = (temp_ASIC_1 + temp_ASIC_2) / 2;
         pwr->chip_temp[0] = temp_ASIC_1;
@@ -226,7 +226,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             pwr->fan_perc = 100;
             Thermal_setFanSpeedPercent(1);
 
-            Power_disable(GLOBAL_STATE);
+            Power_disable(dm);
 
             config_set_u16(config, NVS_CONFIG_ASIC_VOLTAGE, 1000);
             config_set_u16(config, NVS_CONFIG_ASIC_FREQ, 50);
@@ -260,7 +260,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         if (core_voltage != last_core_voltage) {
             ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
-            VCORE_set_voltage((double) core_voltage / 1000.0, GLOBAL_STATE);
+            VCORE_set_voltage((double) core_voltage / 1000.0, dm);
             last_core_voltage = core_voltage;
         }
 
@@ -280,11 +280,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
         uint16_t new_overheat_mode = config_get_u16(config, NVS_CONFIG_OVERHEAT_MODE, 0);
         if (new_overheat_mode != pwr->overheat_mode) {
             pwr->overheat_mode = new_overheat_mode;
-            sys_module->overheat_mode = new_overheat_mode; // Legacy sync
+            GLOBAL_STATE->SYSTEM_MODULE.overheat_mode = new_overheat_mode; // Legacy sync
             ESP_LOGI(TAG, "Overheat mode updated to: %d", pwr->overheat_mode);
         }
 
-        VCORE_check_fault(GLOBAL_STATE);
+        VCORE_check_fault(dm, &pwr->power_fault);
+        GLOBAL_STATE->SYSTEM_MODULE.power_fault = pwr->power_fault; // Legacy sync
 
         // Publish events
         publish_temp_update(pwr);

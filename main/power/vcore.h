@@ -3,10 +3,10 @@
 
 #include "global_state.h"
 
-esp_err_t VCORE_init(GlobalState * global_state);
-esp_err_t VCORE_set_voltage(float core_voltage, GlobalState * global_state);
-int16_t VCORE_get_voltage_mv(GlobalState * global_state);
-esp_err_t VCORE_check_fault(GlobalState * global_state);
-const char* VCORE_get_fault_string(GlobalState * global_state);
+esp_err_t VCORE_init(DeviceModel device_model);
+esp_err_t VCORE_set_voltage(float core_voltage, DeviceModel device_model);
+int16_t VCORE_get_voltage_mv(DeviceModel device_model);
+esp_err_t VCORE_check_fault(DeviceModel device_model, uint8_t *power_fault);
+const char* VCORE_get_fault_string(DeviceModel device_model);
 
 #endif /* VCORE_H_ */

@@ -5,7 +5,7 @@
 #include <esp_err.h>
 #include <stdbool.h>
 
-#include "global_state.h"
+#include <stdint.h>
 
 #define TPS546_I2CADDR         0x24  // TPS546 i2c address
 #define TPS546_I2CADDR_ALERT   0x0C  // TPS546 SMBus Alert address
@@ -183,7 +183,7 @@ esp_err_t TPS546_set_vout(float volts);
 void TPS546_show_voltage_settings(void);
 void TPS546_print_status(void);
 
-esp_err_t TPS546_check_status(GlobalState * global_state);
+esp_err_t TPS546_check_status(uint8_t *power_fault);
 esp_err_t TPS546_clear_faults(void);
 
 const char* TPS546_get_error_message(void); //Get the current TPS error message

@@ -28,6 +28,9 @@ typedef struct {
     // ---- Overheat ----
     uint16_t overheat_mode;
 
+    // ---- Fault state ----
+    uint8_t power_fault;
+
     bool initialized;
 } power_module_t;
 

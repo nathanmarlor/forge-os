@@ -178,14 +178,14 @@ static esp_err_t test_TPS546_power_consumption(int target_power, int margin)
 
 static esp_err_t test_reference_voltages(GlobalState * GLOBAL_STATE) 
 {
-    uint16_t _1V2_voltage = ADC_read(V_1V2_REF, GLOBAL_STATE);
+    uint16_t _1V2_voltage = ADC_read(V_1V2_REF, GLOBAL_STATE->device_model);
     ESP_LOGI(TAG, "1V2 reference voltage: %u", _1V2_voltage); 
     if (_1V2_voltage < REFERENCE_VOLTAGE_1V2_MIN && _1V2_voltage > REFERENCE_VOLTAGE_1V2_MAX) {
         ESP_LOGE(TAG, "1V2 reference voltage TEST FAIL, INCORRECT REFERENCE VOLTAGE");
         return ESP_FAIL;
     }
 
-    uint16_t _0V8_voltage = ADC_read(V_0V8_REF, GLOBAL_STATE);
+    uint16_t _0V8_voltage = ADC_read(V_0V8_REF, GLOBAL_STATE->device_model);
     ESP_LOGI(TAG, "0V8 reference voltage: %u", _0V8_voltage);
     if (_0V8_voltage < REFERENCE_VOLTAGE_0V8_MIN && _0V8_voltage > REFERENCE_VOLTAGE_0V8_MAX) {
         ESP_LOGE(TAG, "0V8 reference voltage TEST FAIL, INCORRECT REFERENCE VOLTAGE");
@@ -196,7 +196,7 @@ static esp_err_t test_reference_voltages(GlobalState * GLOBAL_STATE)
 
 static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 {
-    uint16_t core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
+    uint16_t core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE->device_model);
     ESP_LOGI(TAG, "Voltage: %u", core_voltage);
 
     if (core_voltage > CORE_VOLTAGE_TARGET_MIN && core_voltage < CORE_VOLTAGE_TARGET_MAX) {
@@ -217,17 +217,18 @@ esp_err_t test_input(GlobalState * GLOBAL_STATE) {
 }
 
 esp_err_t init_voltage_regulator(GlobalState * GLOBAL_STATE) {
-    ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE), TAG, "VCORE init failed!");
+    ESP_RETURN_ON_ERROR(VCORE_init(GLOBAL_STATE->device_model), TAG, "VCORE init failed!");
     //ESP_RETURN_ON_ERROR(VCORE_set_voltage(0U, GLOBAL_STATE), TAG, "VCORE set voltage failed!");
-    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE), TAG, "VCORE set voltage failed!");
+    ESP_RETURN_ON_ERROR(VCORE_set_voltage(nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE) / 1000.0, GLOBAL_STATE->device_model), TAG, "VCORE set voltage failed!");
     
     return ESP_OK;
 }
 
 esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE) {
-    ESP_RETURN_ON_ERROR(VCORE_check_fault(GLOBAL_STATE), TAG, "VCORE check fault failed!");
+    uint8_t power_fault = 0;
+    ESP_RETURN_ON_ERROR(VCORE_check_fault(GLOBAL_STATE->device_model, &power_fault), TAG, "VCORE check fault failed!");
 
-    if (GLOBAL_STATE->SYSTEM_MODULE.power_fault) {
+    if (power_fault) {
         return ESP_FAIL;
     }
     return ESP_OK;
@@ -262,7 +263,7 @@ esp_err_t test_init_peripherals(GlobalState * GLOBAL_STATE) {
     //Init the EMC2101 fan and temperature monitoring
     switch (GLOBAL_STATE->device_model) {
         case BITFORGE_NANO:
-            Thermal_init(GLOBAL_STATE);
+            Thermal_init(GLOBAL_STATE->device_model, GLOBAL_STATE->ASIC_initalized);
             break;
         default:
     }
@@ -372,11 +373,11 @@ void execute_production_test(void * pvParameters)
     }
 
     PAC9544_selectChannel(2);
-    float temp_ASIC_1 = Thermal_getAsicChipTemp(GLOBAL_STATE);
+    float temp_ASIC_1 = Thermal_getAsicChipTemp(GLOBAL_STATE->ASIC_initalized);
     ESP_LOGI(TAG, "External Temp of EMC2101_ASIC1: %f", temp_ASIC_1);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     PAC9544_selectChannel(3);
-    float temp_ASIC_2 = Thermal_getAsicChipTemp(GLOBAL_STATE);
+    float temp_ASIC_2 = Thermal_getAsicChipTemp(GLOBAL_STATE->ASIC_initalized);
     ESP_LOGI(TAG, "External Temp of EMC2101_ASIC2: %f", temp_ASIC_2);
 
     //test for voltage regulator faults
@@ -529,7 +530,7 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool test_result, TEST_FAILED
 
     GLOBAL_STATE->SELF_TEST_MODULE.result = test_result;
     GLOBAL_STATE->SELF_TEST_MODULE.finished = true;
-    Power_disable(GLOBAL_STATE);
+    Power_disable(GLOBAL_STATE->device_model);
 
     if (test_result == TESTS_FAILED) {
         ESP_LOGI(TAG, "SELF TESTS FAIL -- Press RESET to continue");  

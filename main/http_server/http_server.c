@@ -706,12 +706,12 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON * root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "power", pwr->power);
     cJSON_AddNumberToObject(root, "voltage", pwr->voltage);
-    cJSON_AddNumberToObject(root, "current", Power_get_current(GLOBAL_STATE));
-    cJSON_AddNumberToObject(root, "vrCurrent", Power_get_vr_current(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "current", Power_get_current(APP_CONTEXT.device_model));
+    cJSON_AddNumberToObject(root, "vrCurrent", Power_get_vr_current(APP_CONTEXT.device_model));
     cJSON_AddNumberToObject(root, "temp", pwr->chip_temp_avg);
     cJSON_AddNumberToObject(root, "vrTemp", pwr->vr_temp);
-    cJSON_AddNumberToObject(root, "maxPower", Power_get_max_settings(GLOBAL_STATE));
-    cJSON_AddNumberToObject(root, "nominalVoltage", Power_get_nominal_voltage(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "maxPower", Power_get_max_settings(APP_CONTEXT.device_model));
+    cJSON_AddNumberToObject(root, "nominalVoltage", Power_get_nominal_voltage(APP_CONTEXT.device_model));
     cJSON_AddNumberToObject(root, "hashRate", stats->hashrate);
     cJSON_AddNumberToObject(root, "errorPercentage", stats->error_percentage);
     float expected_hashrate = (float)config_get_u16(config, NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY)
@@ -750,7 +750,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "largestFreeBlock", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(root, "taskCount", uxTaskGetNumberOfTasks());
     cJSON_AddNumberToObject(root, "coreVoltage", config_get_u16(config, NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
-    cJSON_AddNumberToObject(root, "coreVoltageActual", Power_get_vr_voltage(GLOBAL_STATE));
+    cJSON_AddNumberToObject(root, "coreVoltageActual", Power_get_vr_voltage(APP_CONTEXT.device_model));
     cJSON_AddNumberToObject(root, "frequency", config_get_u16(config, NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY));
     cJSON_AddStringToObject(root, "ssid", ssid);
     cJSON_AddStringToObject(root, "macAddr", formattedMac);
@@ -812,8 +812,8 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "chiptemp1", pwr->chip_temp[0]);
     cJSON_AddNumberToObject(root, "chiptemp2", pwr->chip_temp[1]);
     
-    if (GLOBAL_STATE->SYSTEM_MODULE.power_fault > 0) {
-        cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(GLOBAL_STATE));
+    if (APP_CONTEXT.power.power_fault > 0) {
+        cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(APP_CONTEXT.device_model));
     }
 
     if (strat->block_height > 0) {

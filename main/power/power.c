@@ -18,12 +18,12 @@
 #define NOMINAL_VOLTAGE_5 5 //volts
 #define NOMINAL_VOLTAGE_12 12//volts
 
-esp_err_t Power_disable(GlobalState * GLOBAL_STATE) {
+esp_err_t Power_disable(DeviceModel device_model) {
 
-    switch (GLOBAL_STATE->device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             // Turn off core voltage
-            VCORE_set_voltage(0.0, GLOBAL_STATE);
+            VCORE_set_voltage(0.0, device_model);
             break;
         default:
     }
@@ -31,9 +31,9 @@ esp_err_t Power_disable(GlobalState * GLOBAL_STATE) {
 
 }
 
-float Power_get_max_settings(GlobalState * GLOBAL_STATE) {
+float Power_get_max_settings(DeviceModel device_model) {
 
-    switch (GLOBAL_STATE->device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             return BITFORGE_NANO_MAX_POWER;
         default:
@@ -41,10 +41,10 @@ float Power_get_max_settings(GlobalState * GLOBAL_STATE) {
     }
 }
 
-float Power_get_current(GlobalState * GLOBAL_STATE) {
+float Power_get_current(DeviceModel device_model) {
     float current = 0.0;
 
-    switch (GLOBAL_STATE->device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             current = INA260_read_current();
             break;
@@ -54,10 +54,10 @@ float Power_get_current(GlobalState * GLOBAL_STATE) {
     return current;
 }
 
-float Power_get_power(GlobalState * GLOBAL_STATE) {
+float Power_get_power(DeviceModel device_model) {
     float power = 0.0;
 
-    switch (GLOBAL_STATE->device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             power = INA260_read_power() / 1000.0;
             break;
@@ -68,9 +68,9 @@ float Power_get_power(GlobalState * GLOBAL_STATE) {
 }
 
 
-float Power_get_input_voltage(GlobalState * GLOBAL_STATE) {
+float Power_get_input_voltage(DeviceModel device_model) {
 
-    switch (GLOBAL_STATE->device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             return INA260_read_voltage();
             break;
@@ -80,8 +80,8 @@ float Power_get_input_voltage(GlobalState * GLOBAL_STATE) {
     return 0.0;
 }
 
-int Power_get_nominal_voltage(GlobalState * GLOBAL_STATE) {
-    switch (GLOBAL_STATE->device_model)
+int Power_get_nominal_voltage(DeviceModel device_model) {
+    switch (device_model)
     {
         case BITFORGE_NANO:
             return NOMINAL_VOLTAGE_12;
@@ -90,9 +90,9 @@ int Power_get_nominal_voltage(GlobalState * GLOBAL_STATE) {
     }
 }
 
-float Power_get_vr_voltage(GlobalState * GLOBAL_STATE) {
+float Power_get_vr_voltage(DeviceModel device_model) {
 
-    switch (GLOBAL_STATE->device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             return TPS546_get_vout();
         default:
@@ -101,9 +101,9 @@ float Power_get_vr_voltage(GlobalState * GLOBAL_STATE) {
     return 0.0;
 }
 
-float Power_get_vr_current(GlobalState * GLOBAL_STATE) {
+float Power_get_vr_current(DeviceModel device_model) {
 
-    switch (GLOBAL_STATE->device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             return TPS546_get_iout();
         default:
@@ -112,9 +112,9 @@ float Power_get_vr_current(GlobalState * GLOBAL_STATE) {
     return 0.0;
 }
 
-float Power_get_vreg_temp(GlobalState * GLOBAL_STATE) {
+float Power_get_vreg_temp(DeviceModel device_model) {
 
-    switch (GLOBAL_STATE->device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
                 return TPS546_get_temperature();
             break;

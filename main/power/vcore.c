@@ -30,8 +30,8 @@ static TPS546_CONFIG TPS546_CONFIG_NANO = {
 
 static const char *TAG = "vcore.c";
 
-esp_err_t VCORE_init(GlobalState * GLOBAL_STATE) {
-    switch (GLOBAL_STATE->device_model) {
+esp_err_t VCORE_init(DeviceModel device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             ESP_RETURN_ON_ERROR(INA260_init(), TAG, "INA260 init failed!");
             ESP_RETURN_ON_ERROR(TPS546_init(TPS546_CONFIG_NANO), TAG, "TPS546 init failed!");
@@ -42,9 +42,9 @@ esp_err_t VCORE_init(GlobalState * GLOBAL_STATE) {
     return ESP_OK;
 }
 
-esp_err_t VCORE_set_voltage(float core_voltage, GlobalState * global_state)
+esp_err_t VCORE_set_voltage(float core_voltage, DeviceModel device_model)
 {
-    switch (global_state->device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
                 ESP_LOGI(TAG, "Set ASIC voltage = %.3fV", core_voltage);
                 ESP_RETURN_ON_ERROR(TPS546_set_vout(core_voltage), TAG, "TPS546 set voltage failed!");
@@ -55,9 +55,9 @@ esp_err_t VCORE_set_voltage(float core_voltage, GlobalState * global_state)
     return ESP_OK;
 }
 
-int16_t VCORE_get_voltage_mv(GlobalState * global_state) {
+int16_t VCORE_get_voltage_mv(DeviceModel device_model) {
 
-    switch (global_state->device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             return ADC_get_vcore();
         default:
@@ -65,19 +65,19 @@ int16_t VCORE_get_voltage_mv(GlobalState * global_state) {
     return -1;
 }
 
-esp_err_t VCORE_check_fault(GlobalState * global_state) {
+esp_err_t VCORE_check_fault(DeviceModel device_model, uint8_t *power_fault) {
 
-    switch (global_state->device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
-            ESP_RETURN_ON_ERROR(TPS546_check_status(global_state), TAG, "TPS546 check status failed!");
+            ESP_RETURN_ON_ERROR(TPS546_check_status(power_fault), TAG, "TPS546 check status failed!");
             break;
         default:
     }
     return ESP_OK;
 }
 
-const char* VCORE_get_fault_string(GlobalState * global_state) {
-    switch (global_state->device_model) {
+const char* VCORE_get_fault_string(DeviceModel device_model) {
+    switch (device_model) {
         case BITFORGE_NANO:
             return TPS546_get_error_message();
             break;
@@ -85,4 +85,3 @@ const char* VCORE_get_fault_string(GlobalState * global_state) {
     }
     return NULL;
 }
-
