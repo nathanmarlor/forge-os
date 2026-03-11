@@ -2,7 +2,7 @@
 #define ASIC_H
 
 #include <esp_err.h>
-#include "global_state.h"
+#include "device_model.h"
 #include "common.h"
 #include "asic_module.h"
 

@@ -21,6 +21,7 @@
 #include "esp_psram.h"
 #include "power.h"
 #include "asic.h"
+#include "serial.h"
 #include "app_context.h"
 #include "asic_module.h"
 #include "config.h"

@@ -2,7 +2,6 @@
 #include "esp_timer.h"
 #include "connect.h"
 #include "system.h"
-#include "global_state.h"
 #include "lwip/dns.h"
 #include <lwip/tcpip.h>
 #include "nvs_config.h"

@@ -1,7 +1,7 @@
 #ifndef THERMAL_H
 #define THERMAL_H
 
-#include "global_state.h"
+#include "device_model.h"
 #include "esp_err.h"
 
 // Debug for Thermal readouts

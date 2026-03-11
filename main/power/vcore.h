@@ -1,7 +1,9 @@
 #ifndef VCORE_H_
 #define VCORE_H_
 
-#include "global_state.h"
+#include <stdint.h>
+#include "esp_err.h"
+#include "device_model.h"
 
 esp_err_t VCORE_init(DeviceModel device_model);
 esp_err_t VCORE_set_voltage(float core_voltage, DeviceModel device_model);
