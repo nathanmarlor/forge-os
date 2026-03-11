@@ -406,6 +406,7 @@ void stratum_task(void * pvParameters)
                 if (stratum_api_v1_message.response_success) {
                     ESP_LOGI(TAG, "message result accepted");
                     stats_notify_accepted_share(&APP_CONTEXT.stats);
+                    SYSTEM_led_blink(1);
                 } else {
                     ESP_LOGW(TAG, "message result rejected: %s", stratum_api_v1_message.error_str);
                     stats_notify_rejected_share(&APP_CONTEXT.stats, stratum_api_v1_message.error_str);

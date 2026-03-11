@@ -99,7 +99,7 @@ void app_main(void)
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
     //Init ADC
-    ADC_init(&GLOBAL_STATE);
+    ADC_init(GLOBAL_STATE.device_model);
 
     //initialize the ESP32 NVS
     if (NVSDevice_init() != ESP_OK){
