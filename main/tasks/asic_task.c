@@ -9,6 +9,7 @@
 #include "asic.h"
 #include "app_context.h"
 #include "asic_module.h"
+#include "mining.h"
 
 static const char *TAG = "ASIC_task";
 
@@ -27,6 +28,14 @@ void ASIC_task(void *pvParameters)
     while (1)
     {
         bm_job *next_bm_job = (bm_job *)queue_dequeue(&APP_CONTEXT.ASIC_jobs_queue);
+
+        // Drop stale jobs that were dequeued before a clean but dispatched after.
+        // Without this check, the dispatch re-validates old slots in valid_jobs[],
+        // causing the ASIC to mine old work after a reconnect.
+        if (APP_CONTEXT.abandon_work) {
+            free_bm_job(next_bm_job);
+            continue;
+        }
 
         ASIC_send_work(APP_CONTEXT.device_model, asic, next_bm_job);
 

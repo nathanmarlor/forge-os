@@ -356,6 +356,12 @@ void stratum_task(void * pvParameters)
         // Everything is set up, lets make sure we don't abandon work unnecessarily.
         APP_CONTEXT.abandon_work = 0;
 
+        // Force the first mining.notify to be treated as clean_jobs.
+        // After a reconnect, the ASIC may still have old work loaded.
+        // Without this, the pool could send a non-clean notify and the
+        // old ASIC jobs would coexist with new ones, causing stale submissions.
+        bool force_clean = true;
+
         while (1) {
             taskYIELD(); // allow IDLE task to reset watchdog when recv() is not blocking
             char * line = STRATUM_V1_receive_jsonrpc_line(strat->sock);
@@ -373,14 +379,17 @@ void stratum_task(void * pvParameters)
             if (stratum_api_v1_message.method == MINING_NOTIFY) {
                 sync_clock(stratum_api_v1_message.mining_notification->ntime);
                 decode_mining_notification(strat, stratum_api_v1_message.mining_notification);
-                if (stratum_api_v1_message.should_abandon_work &&
+                bool should_clean = stratum_api_v1_message.should_abandon_work || force_clean;
+                if (should_clean &&
                     (APP_CONTEXT.stratum_queue.count > 0 || APP_CONTEXT.ASIC_jobs_queue.count > 0)) {
-                    ESP_LOGI(TAG, "Clean Jobs: new_job=%s (abandoning %d queued + %d ASIC jobs)",
+                    ESP_LOGI(TAG, "Clean Jobs: new_job=%s (abandoning %d queued + %d ASIC jobs)%s",
                              stratum_api_v1_message.mining_notification->job_id,
                              APP_CONTEXT.stratum_queue.count,
-                             APP_CONTEXT.ASIC_jobs_queue.count);
+                             APP_CONTEXT.ASIC_jobs_queue.count,
+                             force_clean ? " [reconnect]" : "");
                     clean_queue(&APP_CONTEXT);
                 }
+                force_clean = false;
                 // Drop oldest notification if queue is full (non-blocking to avoid TOCTOU deadlock)
                 mining_notify *dropped = (mining_notify *)queue_try_dequeue(&APP_CONTEXT.stratum_queue);
                 if (dropped) {
