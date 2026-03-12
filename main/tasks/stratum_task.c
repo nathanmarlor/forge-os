@@ -403,12 +403,11 @@ void stratum_task(void * pvParameters)
                 strat->new_version_rolling_msg = true;
             } else if (stratum_api_v1_message.method == STRATUM_RESULT_SUBSCRIBE) {
                 pthread_mutex_lock(&strat->connection_lock);
-                if (strat->extranonce_str) {
-                    free(strat->extranonce_str);
-                }
+                char *old_extranonce = strat->extranonce_str;
                 strat->extranonce_str = stratum_api_v1_message.extranonce_str;
                 strat->extranonce_2_len = stratum_api_v1_message.extranonce_2_len;
                 pthread_mutex_unlock(&strat->connection_lock);
+                free(old_extranonce);
             } else if (stratum_api_v1_message.method == CLIENT_RECONNECT) {
                 ESP_LOGE(TAG, "Pool requested client reconnect...");
                 stratum_close_connection();
