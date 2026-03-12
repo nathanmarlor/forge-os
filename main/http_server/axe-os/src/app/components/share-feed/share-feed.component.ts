@@ -14,15 +14,19 @@ interface ShareEntry {
   selector: 'app-share-feed',
   styles: [`
     :host {
-      display: block;
-      padding: 1.25rem 1rem 1.5rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      padding: 0.75rem 0.75rem 0.75rem 0.75rem;
       overflow: hidden;
+      height: 100%;
+      box-sizing: border-box;
     }
     .feed-header {
       display: flex;
       align-items: center;
+      justify-content: flex-end;
       gap: 0.5rem;
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.5rem;
     }
     .feed-title {
       color: #94a3b8;
@@ -62,8 +66,9 @@ interface ShareEntry {
       background: rgba(99, 102, 241, 0.12);
     }
     .feed-list {
-      max-height: 200px;
+      flex: 1 1 0;
       overflow-y: auto;
+      overflow-x: hidden;
       scrollbar-width: thin;
       scrollbar-color: #334155 transparent;
     }
@@ -73,6 +78,7 @@ interface ShareEntry {
     .feed-row {
       display: flex;
       align-items: center;
+      gap: 0.5rem;
       padding: 0.3rem 0.5rem;
       border-radius: 0.375rem;
       margin-bottom: 1px;
@@ -87,15 +93,13 @@ interface ShareEntry {
       color: #64748b;
       font-size: 0.7rem;
       font-family: monospace;
-      width: 4.5rem;
       flex-shrink: 0;
     }
     .feed-diff {
       color: #f1f5f9;
       font-weight: 600;
       font-size: 0.85rem;
-      flex: 1 1 0;
-      min-width: 0;
+      flex-shrink: 0;
     }
     .feed-badge {
       font-size: 0.6rem;
@@ -104,6 +108,8 @@ interface ShareEntry {
       padding: 1px 6px;
       border-radius: 3px;
       text-transform: uppercase;
+      flex-shrink: 0;
+      margin-left: auto;
     }
     .badge-submitted {
       background: rgba(99, 102, 241, 0.15);
@@ -117,12 +123,11 @@ interface ShareEntry {
       color: #64748b;
       font-size: 0.8rem;
       text-align: center;
-      padding: 1.5rem 0;
+      padding: 0.75rem 0;
     }
   `],
   template: `
     <div class="feed-header">
-      <span class="feed-title">Live Share Feed</span>
       <div class="filter-toggle">
         <button class="filter-btn" [class.active]="filter === 'all'" (click)="filter = 'all'">All</button>
         <button class="filter-btn" [class.active]="filter === 'submitted'" (click)="filter = 'submitted'">Submitted</button>
