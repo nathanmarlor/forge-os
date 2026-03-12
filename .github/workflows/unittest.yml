@@ -21,6 +21,11 @@ jobs:
         target: esp32s3
         command: GITHUB_ACTIONS="true" idf.py build
         path: 'test-ci'
+    - name: Fix flash_args for QEMU action
+      run: |
+        # Strip --flash-mode/freq/size flags that newer IDF adds to flash_args
+        # The QEMU action's merge_bin call can't handle them
+        sed -i '/^--flash/d' test-ci/build/flash_args
     - name: Run tests and show result
       uses: bitaxeorg/esp32-qemu-test-action@main
       with:
