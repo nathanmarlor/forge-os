@@ -5,6 +5,5 @@
 
 void MINER_set_wifi_status(wifi_status_t status, int retry_count, int reason);
 void MINER_set_ap_status(bool enabled);
-void self_test(void * pvParameters, bool production_test);
 
 #endif /* MAIN_H_ */

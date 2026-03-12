@@ -28,7 +28,11 @@ html_doc/
 components/components/*
 config.bin
 config.cvs
-managed_components/*
+managed_components/
+**/managed_components/
 
-.cache/.DS_Store
+.cache/
 .DS_Store
+crash.log
+miner.log
+scripts/

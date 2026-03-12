@@ -1,4 +1,5 @@
 #include "work_queue.h"
+#include "mining.h"
 #include "esp_log.h"
 
 void queue_init(work_queue *queue)

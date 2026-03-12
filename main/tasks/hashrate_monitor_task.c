@@ -35,10 +35,3 @@ void hashrate_monitor_task(void *pvParameters)
         vTaskDelayUntil(&taskWakeTime, POLL_RATE / portTICK_PERIOD_MS);
     }
 }
-
-void hashrate_monitor_register_read(void *pvParameters, register_type_t register_type,
-                                    uint8_t asic_nr, uint32_t value)
-{
-    extern app_context_t APP_CONTEXT;
-    stats_handle_register_read(&APP_CONTEXT.stats, register_type, asic_nr, value);
-}

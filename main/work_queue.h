@@ -2,7 +2,6 @@
 #define WORK_QUEUE_H
 
 #include <pthread.h>
-#include "mining.h"
 
 #define QUEUE_SIZE 12
 

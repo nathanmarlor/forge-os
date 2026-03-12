@@ -7,15 +7,11 @@
 #include "esp_err.h"
 
 /**
- * Config Module (Architecture V2, Phase 2)
+ * Config Module
  *
  * Wraps NVS access with an in-memory cache and publishes EVT_CONFIG_CHANGED
  * events when values are modified. Subscribers (power, stratum) react to
  * changes instead of polling NVS every 2 seconds.
- *
- * During migration, the legacy nvs_config_get/set functions remain available.
- * New code should use config_get_u16 / config_set_u16 which read from cache
- * and publish change events.
  */
 
 typedef struct {
