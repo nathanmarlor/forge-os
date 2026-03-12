@@ -1102,18 +1102,23 @@ int log_to_queue(const char * format, va_list args)
     return 0;
 }
 
-/* ---- Runtime self-test via WebSocket ---- */
+/* ---- WebSocket JSON broadcast ---- */
+
+bool http_server_ws_send_str(char *str)
+{
+    if (str == NULL) return false;
+    if (xQueueSendToBack(log_queue, (void *)&str, pdMS_TO_TICKS(100)) != pdPASS) {
+        free(str);
+        return false;
+    }
+    return true;
+}
 
 static void ws_send_json(cJSON *obj)
 {
     char *str = cJSON_PrintUnformatted(obj);
     cJSON_Delete(obj);
-    if (str == NULL) return;
-
-    // Route through the log queue so all WS sends go through a single task
-    if (xQueueSendToBack(log_queue, (void *)&str, pdMS_TO_TICKS(100)) != pdPASS) {
-        free(str);
-    }
+    http_server_ws_send_str(str);
 }
 
 static void ws_progress_callback(int step, const char *name, bool passed, const char *detail)

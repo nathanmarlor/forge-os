@@ -44,6 +44,48 @@
   .metric-icon, .chart-icon, .status-icon, .info-icon { color: #6366f1; font-size: 1.2rem; }
 }
 
+.feed-toggle-btn {
+  background: none; border: 1px solid rgba(51, 65, 85, 0.5); border-radius: 0.375rem;
+  color: #94a3b8; cursor: pointer; padding: 0.2rem 0.5rem; font-size: 0.75rem;
+  transition: all 0.15s ease; display: flex; align-items: center;
+  &:hover { color: #f1f5f9; border-color: #6366f1; background: rgba(99, 102, 241, 0.1); }
+}
+
+.shares-wrapper {
+  display: flex;
+  min-width: 0;
+  > .metric-card.shares {
+    flex: 1 1 auto;
+    min-width: 0;
+    border-radius: 1rem;
+    transition: border-radius 0.3s ease, flex 0.3s ease;
+  }
+  > .feed-panel {
+    flex: 1 1 0;
+    min-width: 0;
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--card-border);
+    border-left: none;
+    border-radius: 0 1rem 1rem 0;
+    overflow: hidden;
+    animation: slideFeedIn 0.3s ease;
+  }
+  &.shares-expanded {
+    grid-column: span 2;
+    > .metric-card.shares {
+      flex: 0 0 150px;
+      border-radius: 1rem 0 0 1rem;
+      border-right: none;
+    }
+  }
+}
+
+@keyframes slideFeedIn {
+  from { max-width: 0; opacity: 0; }
+  to { max-width: 600px; opacity: 1; }
+}
+
 .chart-header, .status-header, .info-header {
   gap: 0.75rem; justify-content: flex-start;
   .chart-title, .status-title, .info-title { font-size: 1.25rem; font-weight: 600; color: var(--text-primary); }
@@ -147,6 +189,12 @@
   .metric-value { font-size: 1.5rem; }
   .uptime-value { font-size: 2rem; }
   .chart-header, .status-header, .info-header { .chart-title, .status-title, .info-title { font-size: 1.1rem; } }
+  .shares-wrapper {
+    flex-direction: column;
+    &.shares-expanded { grid-column: span 1; }
+    &.shares-expanded > .metric-card.shares { flex: 1 1 auto !important; border-radius: 1rem 1rem 0 0 !important; border-right: 1px solid var(--card-border) !important; border-bottom: none !important; }
+    > .feed-panel { border-radius: 0 0 1rem 1rem !important; border-left: 1px solid var(--card-border) !important; border-top: none !important; max-width: none !important; }
+  }
 }
 
 @media (max-width: 480px) {

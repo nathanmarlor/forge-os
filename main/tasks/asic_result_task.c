@@ -12,6 +12,8 @@
 #include "stats.h"
 #include "stratum_module.h"
 #include "asic_module.h"
+#include "http_server.h"
+#include "cJSON.h"
 
 static const char *TAG = "asic_result";
 
@@ -84,6 +86,18 @@ void ASIC_result_task(void *pvParameters)
             ESP_LOGI(TAG, "Submitting share: job=%s nonce=%08" PRIX32 " diff=%.1f pool_diff=%ld",
                      jobid_buf, asic_result->nonce, nonce_diff,
                      asic->active_jobs[job_id]->pool_diff);
+        }
+
+        // Broadcast share to WebSocket for live feed
+        if (nonce_diff >= 1.0)
+        {
+            cJSON *obj = cJSON_CreateObject();
+            cJSON_AddStringToObject(obj, "type", "share");
+            cJSON_AddNumberToObject(obj, "diff", nonce_diff);
+            cJSON_AddBoolToObject(obj, "submitted", should_submit);
+            char *str = cJSON_PrintUnformatted(obj);
+            cJSON_Delete(obj);
+            http_server_ws_send_str(str);
         }
 
         pthread_mutex_unlock(asic->jobs_lock);

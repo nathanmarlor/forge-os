@@ -25,6 +25,8 @@ export class HomeComponent {
   public chartY2Data: number[] = []
   public chartData?: any
 
+  public shareFeedVisible = false
+
   public maxPower = 0
   public nominalVoltage = 0
   public maxTemp = 75

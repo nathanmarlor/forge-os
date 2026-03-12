@@ -88,23 +88,29 @@
             </div>
         </div>
 
-        <div class="metric-card shares">
-            <div class="metric-header">
-                <span class="metric-label">Shares</span>
-                <i class="pi pi-share-alt metric-icon"></i>
-            </div>
-            <div class="metric-content">
-                <div class="metric-value">{{info.sharesAccepted | number: '1.0-0'}}</div>
-                <div class="metric-details">
-                    <span *ngIf="info.sharesRejected === 0" class="metric-status success">0 rejected</span>
-                    <div *ngIf="info.sharesRejected > 0">
-                        <div *ngFor="let sharesRejectedReason of info.sharesRejectedReasons" class="metric-status error">
-                            {{sharesRejectedReason.count | number: '1.0-0'}} {{sharesRejectedReason.message}}
-                            ({{(sharesRejectedReason.count / (info.sharesAccepted + info.sharesRejected) * 100) | number: '1.2-2'}}%)
+        <div class="shares-wrapper" [class.shares-expanded]="shareFeedVisible">
+            <div class="metric-card shares">
+                <div class="metric-header">
+                    <span class="metric-label">Shares</span>
+                    <button class="feed-toggle-btn" (click)="shareFeedVisible = !shareFeedVisible"
+                            [pTooltip]="shareFeedVisible ? 'Hide live feed' : 'Show live feed'" tooltipPosition="top">
+                        <i class="pi" [ngClass]="shareFeedVisible ? 'pi-chevron-left' : 'pi-chevron-right'"></i>
+                    </button>
+                </div>
+                <div class="metric-content">
+                    <div class="metric-value">{{info.sharesAccepted | number: '1.0-0'}}</div>
+                    <div class="metric-details">
+                        <span *ngIf="info.sharesRejected === 0" class="metric-status success">0 rejected</span>
+                        <div *ngIf="info.sharesRejected > 0">
+                            <div *ngFor="let sharesRejectedReason of info.sharesRejectedReasons" class="metric-status error">
+                                {{sharesRejectedReason.count | number: '1.0-0'}} {{sharesRejectedReason.message}}
+                                ({{(sharesRejectedReason.count / (info.sharesAccepted + info.sharesRejected) * 100) | number: '1.2-2'}}%)
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+            <app-share-feed class="feed-panel" *ngIf="shareFeedVisible"></app-share-feed>
         </div>
 
         <div class="metric-card difficulty">
