@@ -70,6 +70,9 @@ export class LogsComponent implements OnDestroy, AfterViewChecked {
     if (this.showLogs) {
       this.websocketSubscription = this.websocketService.ws$.subscribe({
         next: (val) => {
+          // Skip structured JSON messages (share feed, self-test, etc.)
+          if (val.startsWith('{')) return;
+
           const matches = val.matchAll(/\[(\d+;\d+)m(.*?)(?=\[|\n|$)/g);
           let className = 'ansi-white'; // default color
           

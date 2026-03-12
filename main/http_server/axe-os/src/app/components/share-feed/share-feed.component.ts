@@ -16,7 +16,7 @@ interface ShareEntry {
     :host {
       display: flex;
       flex-direction: column;
-      padding: 0.75rem 0.75rem 0.75rem 0.75rem;
+      padding: 0.75rem;
       overflow: hidden;
       height: 100%;
       box-sizing: border-box;
@@ -67,6 +67,8 @@ interface ShareEntry {
     }
     .feed-list {
       flex: 1 1 0;
+      min-height: 120px;
+      max-height: 250px;
       overflow-y: auto;
       overflow-x: hidden;
       scrollbar-width: thin;

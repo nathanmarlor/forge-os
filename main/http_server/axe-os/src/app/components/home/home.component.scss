@@ -61,8 +61,8 @@
   &::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: linear-gradient(135deg, #f59e0b, #eab308); }
 
   > .metric-card.shares {
-    flex: 0 0 auto;
-    min-width: 0;
+    flex: 0 1 auto;
+    min-width: 120px;
     background: none !important;
     backdrop-filter: none !important;
     border: none !important;
@@ -183,7 +183,8 @@
   .chart-header, .status-header, .info-header { .chart-title, .status-title, .info-title { font-size: 1.1rem; } }
   .shares-wrapper {
     flex-direction: column;
-    > .feed-panel { border-left: none !important; border-top: 1px dashed rgba(245, 158, 11, 0.15) !important; }
+    > .metric-card.shares { min-width: 0 !important; flex: 0 0 auto !important; }
+    > .feed-panel { flex: 0 0 auto !important; border-left: none !important; border-top: 1px dashed rgba(245, 158, 11, 0.15) !important; overflow: visible !important; max-height: none !important; }
   }
 }
 
