@@ -23,6 +23,12 @@ void ASIC_result_task(void *pvParameters)
 
     while (1)
     {
+        // Yield UART to runtime self-test hash validation
+        if (APP_CONTEXT.self_test.running) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
         task_result *asic_result = ASIC_process_work(APP_CONTEXT.device_model, asic);
 
         if (asic_result == NULL)

@@ -522,6 +522,202 @@ void execute_production_test(void)
     return;
 }
 
+bool runtime_self_test(self_test_progress_cb cb)
+{
+    bool all_passed = true;
+    int step = 0;
+    esp_err_t rc;
+    char detail[128];
+
+    // Step 0: PSRAM
+    {
+        rc = test_psram();
+        if (rc == ESP_OK) {
+            snprintf(detail, sizeof(detail), "PSRAM initialized: %u KB available",
+                     (unsigned)(esp_psram_get_size() / 1024));
+        } else {
+            snprintf(detail, sizeof(detail), "PSRAM not detected or not initialized");
+        }
+        cb(step++, "PSRAM", rc == ESP_OK, detail);
+        if (rc != ESP_OK) all_passed = false;
+    }
+
+    // Step 1: Fan Speed
+    {
+        uint16_t fan_rpm = Thermal_getFanSpeed();
+        rc = test_fan_sense();
+        if (rc == ESP_OK) {
+            snprintf(detail, sizeof(detail), "Fan: %u RPM (min: %u RPM)", fan_rpm, FAN_SPEED_TARGET_MIN);
+        } else {
+            snprintf(detail, sizeof(detail), "Fan: %u RPM — below minimum %u RPM", fan_rpm, FAN_SPEED_TARGET_MIN);
+        }
+        cb(step++, "Fan Speed", rc == ESP_OK, detail);
+        if (rc != ESP_OK) all_passed = false;
+    }
+
+    // Step 2: Reference Voltages (1V2, 0V8)
+    {
+        uint16_t v1v2 = ADC_read(V_1V2_REF, APP_CONTEXT.device_model);
+        uint16_t v0v8 = ADC_read(V_0V8_REF, APP_CONTEXT.device_model);
+        rc = test_reference_voltages();
+        snprintf(detail, sizeof(detail), "1V2: %u mV [%u-%u], 0V8: %u mV [%u-%u]",
+                 v1v2, REFERENCE_VOLTAGE_1V2_MIN, REFERENCE_VOLTAGE_1V2_MAX,
+                 v0v8, REFERENCE_VOLTAGE_0V8_MIN, REFERENCE_VOLTAGE_0V8_MAX);
+        cb(step++, "Reference Voltages", rc == ESP_OK, detail);
+        if (rc != ESP_OK) all_passed = false;
+    }
+
+    // Step 3: Core Voltage
+    {
+        uint16_t core_mv = VCORE_get_voltage_mv(APP_CONTEXT.device_model);
+        rc = test_core_voltage();
+        snprintf(detail, sizeof(detail), "VCORE: %u mV [%u-%u]",
+                 core_mv, CORE_VOLTAGE_TARGET_MIN, CORE_VOLTAGE_TARGET_MAX);
+        cb(step++, "Core Voltage", rc == ESP_OK, detail);
+        if (rc != ESP_OK) all_passed = false;
+    }
+
+    // Step 4: VREG Faults
+    {
+        uint8_t fault = 0;
+        VCORE_check_fault(APP_CONTEXT.device_model, &fault);
+        rc = (fault == 0) ? ESP_OK : ESP_FAIL;
+        if (rc == ESP_OK) {
+            snprintf(detail, sizeof(detail), "No power faults detected");
+        } else {
+            snprintf(detail, sizeof(detail), "Fault register: 0x%02X — %s",
+                     fault, VCORE_get_fault_string(APP_CONTEXT.device_model));
+        }
+        cb(step++, "VREG Faults", rc == ESP_OK, detail);
+        if (rc != ESP_OK) all_passed = false;
+    }
+
+    // Step 5: ASIC Temperature 1
+    {
+        PAC9544_selectChannel(2);
+        float temp1 = Thermal_getAsicChipTemp(APP_CONTEXT.asic_initialized);
+        bool ok = (temp1 > 0 && temp1 < 120);
+        snprintf(detail, sizeof(detail), "ASIC 1: %.1f C (range: 0-120 C)", temp1);
+        cb(step++, "ASIC Temperature 1", ok, detail);
+        if (!ok) all_passed = false;
+    }
+
+    // Step 6: ASIC Temperature 2
+    {
+        PAC9544_selectChannel(3);
+        float temp2 = Thermal_getAsicChipTemp(APP_CONTEXT.asic_initialized);
+        bool ok = (temp2 > 0 && temp2 < 120);
+        snprintf(detail, sizeof(detail), "ASIC 2: %.1f C (range: 0-120 C)", temp2);
+        cb(step++, "ASIC Temperature 2", ok, detail);
+        if (!ok) all_passed = false;
+    }
+
+    // Step 7: Power Consumption (INA260)
+    {
+        float power = INA260_read_power() / 1000.0f;
+        float rt_power_min = 5.0f;
+        float rt_power_max = 60.0f;
+        bool ok = (power > rt_power_min && power < rt_power_max);
+        snprintf(detail, sizeof(detail), "INA260: %.1f W (range: %.0f-%.0f W)",
+                 power, rt_power_min, rt_power_max);
+        cb(step++, "Power Consumption", ok, detail);
+        if (!ok) all_passed = false;
+    }
+
+    // Step 8: Hash Validation — send known test job, validate nonce outputs
+    {
+        // Build the same known test job used by production test
+        mining_notify notify_message;
+        notify_message.job_id = 0;
+        notify_message.prev_block_hash = "0c859545a3498373a57452fac22eb7113df2a465000543520000000000000000";
+        notify_message.version = 0x20000004;
+        notify_message.version_mask = 0x1fffe000;
+        notify_message.target = 0x1705ae3a;
+        notify_message.ntime = 0x647025b5;
+        notify_message.difficulty = 1000000;
+
+        const char *coinbase_tx =
+            "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4b0389130cfab"
+            "e6d6d5cbab26a2599e92916edec"
+            "5657a94a0708ddb970f5c45b5d12905085617eff8e010000000000000031650707758de07b010000000000001cfd703"
+            "8212f736c7573682f0000000003"
+            "79ad0c2a000000001976a9147c154ed1dc59609e3d26abb2df2ea3d587cd8c4188ac00000000000000002c6a4c29525"
+            "34b424c4f434b3ae725d3994b81"
+            "1572c1f345deb98b56b465ef8e153ecbbd27fa37bf1b005161380000000000000000266a24aa21a9ed63b06a7946b19"
+            "0a3fda1d76165b25c9b883bcc66"
+            "21b040773050ee2a1bb18f1800000000";
+
+        uint8_t merkles[13][32];
+        hex2bin("2b77d9e413e8121cd7a17ff46029591051d0922bd90b2b2a38811af1cb57a2b2", merkles[0], 32);
+        hex2bin("5c8874cef00f3a233939516950e160949ef327891c9090467cead995441d22c5", merkles[1], 32);
+        hex2bin("2d91ff8e19ac5fa69a40081f26c5852d366d608b04d2efe0d5b65d111d0d8074", merkles[2], 32);
+        hex2bin("0ae96f609ad2264112a0b2dfb65624bedbcea3b036a59c0173394bba3a74e887", merkles[3], 32);
+        hex2bin("e62172e63973d69574a82828aeb5711fc5ff97946db10fc7ec32830b24df7bde", merkles[4], 32);
+        hex2bin("adb49456453aab49549a9eb46bb26787fb538e0a5f656992275194c04651ec97", merkles[5], 32);
+        hex2bin("a7bc56d04d2672a8683892d6c8d376c73d250a4871fdf6f57019bcc737d6d2c2", merkles[6], 32);
+        hex2bin("d94eceb8182b4f418cd071e93ec2a8993a0898d4c93bc33d9302f60dbbd0ed10", merkles[7], 32);
+        hex2bin("5ad7788b8c66f8f50d332b88a80077ce10e54281ca472b4ed9bbbbcb6cf99083", merkles[8], 32);
+        hex2bin("9f9d784b33df1b3ed3edb4211afc0dc1909af9758c6f8267e469f5148ed04809", merkles[9], 32);
+        hex2bin("48fd17affa76b23e6fb2257df30374da839d6cb264656a82e34b350722b05123", merkles[10], 32);
+        hex2bin("c4f5ab01913fc186d550c1a28f3f3e9ffaca2016b961a6a751f8cca0089df924", merkles[11], 32);
+        hex2bin("cff737e1d00176dd6bbfa73071adbb370f227cfb5fba186562e4060fcec877e1", merkles[12], 32);
+
+        char *merkle_root = calculate_merkle_root_hash(coinbase_tx, merkles, 13);
+        bm_job job = construct_bm_job(&notify_message, merkle_root, 0x1fffe000);
+        free(merkle_root);
+
+        asic_module_t *asic = &APP_CONTEXT.asic;
+        uint32_t saved_difficulty = asic->asic_difficulty;
+
+        // Set test difficulty and re-init module for clean job tracking
+        uint8_t test_difficulty = 8;
+        ASIC_set_job_difficulty_mask(APP_CONTEXT.device_model, test_difficulty);
+        asic_module_init(asic, APP_CONTEXT.asic_job_frequency_ms, test_difficulty);
+
+        // Send test work to ASICs
+        ASIC_send_work(APP_CONTEXT.device_model, asic, &job);
+        vTaskDelay(pdMS_TO_TICKS(500));
+
+        // Collect nonces for 3 seconds
+        uint32_t start_ms = esp_timer_get_time() / 1000;
+        uint32_t duration_ms = 0;
+        uint32_t nonce_count = 0;
+        uint32_t valid_count = 0;
+        uint32_t hashtest_ms = 3000;
+
+        while (duration_ms < hashtest_ms) {
+            task_result *result = ASIC_process_work(APP_CONTEXT.device_model, asic);
+            if (result != NULL && result->register_type == REGISTER_INVALID) {
+                nonce_count++;
+                double nonce_diff = test_nonce_value(&job, result->nonce, result->rolled_version);
+                if (nonce_diff >= (double)test_difficulty) {
+                    valid_count++;
+                }
+            }
+            duration_ms = (esp_timer_get_time() / 1000) - start_ms;
+        }
+
+        float hashrate_ghs = stats_hash_counter_to_ghs(duration_ms, valid_count * test_difficulty);
+
+        // Restore ASIC difficulty and re-init module for normal mining
+        ASIC_set_job_difficulty_mask(APP_CONTEXT.device_model, saved_difficulty);
+        asic_module_init(asic, APP_CONTEXT.asic_job_frequency_ms, saved_difficulty);
+
+        bool ok = (valid_count > 0 && valid_count == nonce_count);
+        if (ok) {
+            snprintf(detail, sizeof(detail), "%"PRIu32" nonces validated, %.1f GH/s (%"PRIu32" ms)",
+                     valid_count, hashrate_ghs, duration_ms);
+        } else {
+            snprintf(detail, sizeof(detail), "%"PRIu32"/%"PRIu32" valid nonces, %.1f GH/s (%"PRIu32" ms)",
+                     valid_count, nonce_count, hashrate_ghs, duration_ms);
+        }
+        cb(step++, "Hash Validation", ok, detail);
+        if (!ok) all_passed = false;
+    }
+
+    return all_passed;
+}
+
 static void tests_done(bool test_result, TEST_FAILED_CAUSE cause)
 {
     APP_CONTEXT.self_test.result = test_result;

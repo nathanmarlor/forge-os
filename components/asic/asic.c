@@ -57,10 +57,10 @@ int ASIC_set_max_baud(DeviceModel device_model) {
 }
 
 // .set_difficulty_mask_fn = BM1366_set_job_difficulty_mask,
-void ASIC_set_job_difficulty_mask(DeviceModel device_model, uint8_t mask) {
+void ASIC_set_job_difficulty_mask(DeviceModel device_model, int difficulty) {
     switch (device_model) {
         case BITFORGE_NANO:
-            BM1370_set_job_difficulty_mask(mask);
+            BM1370_set_job_difficulty_mask(difficulty);
             break;
         default:
     }

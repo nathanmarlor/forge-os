@@ -37,6 +37,7 @@ typedef struct {
 // ---- Self-test state ----
 typedef struct {
     bool active;
+    bool running;       // runtime self-test in progress (re-entry guard)
     char *message;
     bool result;
     bool finished;

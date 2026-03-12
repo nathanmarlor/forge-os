@@ -21,6 +21,7 @@ export class SettingsComponent {
   public firmwareUpdateProgress: number | null = null;
   public websiteUpdateProgress: number | null = null;
 
+  public selfTestVisible = false;
 
   public eASICModel = eASICModel;
   public ASICModel!: eASICModel;
@@ -196,5 +197,23 @@ export class SettingsComponent {
 
     });
     this.toastr.success('Success!', 'BitForge restarted');
+  }
+
+  public startSelfTest() {
+    this.systemService.startSelfTest().subscribe({
+      next: () => {
+        this.selfTestVisible = true;
+      },
+      error: (err) => {
+        if (err.status === 409) {
+          this.toastr.error('Self-test is already running', 'Error');
+          this.selfTestVisible = true;
+        } else if (err.status === 503) {
+          this.toastr.warning('System still initializing, please wait', 'Not Ready');
+        } else {
+          this.toastr.error('Failed to start self-test', 'Error');
+        }
+      }
+    });
   }
 }

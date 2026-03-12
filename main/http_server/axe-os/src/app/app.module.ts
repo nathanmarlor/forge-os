@@ -27,6 +27,7 @@ import { HashSuffixPipe } from './pipes/hash-suffix.pipe';
 import { TruncateMiddlePipe } from './pipes/truncate-middle.pipe';
 import { DiffSuffixPipe } from './pipes/diff-suffix.pipe';
 import { ModalComponent } from './components/modal/modal.component';
+import { SelfTestDialogComponent } from './components/self-test/self-test-dialog.component';
 import { PrimeNGModule } from './prime-ng.module';
 import { MessageModule } from 'primeng/message';
 import { TooltipModule } from 'primeng/tooltip';
@@ -60,7 +61,8 @@ const components = [
     TruncateMiddlePipe,
     PoolComponent,
     ModalComponent,
-    DialogListComponent
+    DialogListComponent,
+    SelfTestDialogComponent
   ],
   imports: [
     BrowserModule,

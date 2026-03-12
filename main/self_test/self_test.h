@@ -14,4 +14,7 @@ typedef enum test_failed_cause
 void execute_production_test(void);
 bool production_test(void);
 
+typedef void (*self_test_progress_cb)(int step, const char *name, bool passed, const char *detail);
+bool runtime_self_test(self_test_progress_cb cb);
+
 #endif

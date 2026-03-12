@@ -127,6 +127,10 @@ export class SystemService {
   }
 
 
+  public startSelfTest() {
+    return this.httpClient.post('/api/system/selftest', {});
+  }
+
   public getSwarmInfo(uri: string = ''): Observable<{ ip: string }[]> {
     return this.httpClient.get(`${uri}/api/swarm/info`) as Observable<{ ip: string }[]>;
   }

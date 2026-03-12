@@ -41,6 +41,9 @@
 #include "stats.h"
 #include "power_module.h"
 #include "stratum_module.h"
+#include "self_test.h"
+#include "serial.h"
+#include "asic_module.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -795,6 +798,7 @@ static esp_err_t GET_system_info(httpd_req_t * req)
 
     cJSON_AddNumberToObject(root, "overheat_mode", config_get_u16(config, NVS_CONFIG_OVERHEAT_MODE, 0));
     cJSON_AddNumberToObject(root, "overclockEnabled", config_get_u16(config, NVS_CONFIG_OVERCLOCK_ENABLED, 0));
+    cJSON_AddBoolToObject(root, "selfTestRunning", APP_CONTEXT.self_test.running);
 
     cJSON_AddNumberToObject(root, "autofanspeed", config_get_u16(config, NVS_CONFIG_AUTO_FAN_SPEED, 1));
 
@@ -1098,26 +1102,139 @@ int log_to_queue(const char * format, va_list args)
     return 0;
 }
 
+/* ---- Runtime self-test via WebSocket ---- */
+
+static void ws_send_json(cJSON *obj)
+{
+    char *str = cJSON_PrintUnformatted(obj);
+    cJSON_Delete(obj);
+    if (str == NULL) return;
+
+    // Route through the log queue so all WS sends go through a single task
+    if (xQueueSendToBack(log_queue, (void *)&str, pdMS_TO_TICKS(100)) != pdPASS) {
+        free(str);
+    }
+}
+
+static void ws_progress_callback(int step, const char *name, bool passed, const char *detail)
+{
+    cJSON *obj = cJSON_CreateObject();
+    cJSON_AddStringToObject(obj, "type", "self_test");
+    cJSON_AddStringToObject(obj, "event", "step_result");
+    cJSON_AddNumberToObject(obj, "step", step);
+    cJSON_AddStringToObject(obj, "name", name);
+    cJSON_AddBoolToObject(obj, "passed", passed);
+    cJSON_AddStringToObject(obj, "detail", detail ? detail : "");
+    ws_send_json(obj);
+}
+
+#define SELF_TEST_TOTAL_STEPS 9
+
+static void runtime_self_test_task(void *pvParameters)
+{
+    (void)pvParameters;
+
+    // Pause mining
+    APP_CONTEXT.abandon_work = 1;
+    vTaskDelay(pdMS_TO_TICKS(500));
+
+    // Send started event
+    {
+        cJSON *obj = cJSON_CreateObject();
+        cJSON_AddStringToObject(obj, "type", "self_test");
+        cJSON_AddStringToObject(obj, "event", "started");
+        cJSON_AddNumberToObject(obj, "total_steps", SELF_TEST_TOTAL_STEPS);
+        ws_send_json(obj);
+    }
+
+    bool passed = runtime_self_test(ws_progress_callback);
+
+    // Send completed event
+    {
+        cJSON *obj = cJSON_CreateObject();
+        cJSON_AddStringToObject(obj, "type", "self_test");
+        cJSON_AddStringToObject(obj, "event", "completed");
+        cJSON_AddBoolToObject(obj, "passed", passed);
+        ws_send_json(obj);
+    }
+
+    // Resume mining — let stratum deliver new work
+    APP_CONTEXT.abandon_work = 0;
+
+    // ASICs keep producing test-job nonces until real work arrives. Keep
+    // self_test.running true (ASIC_result_task yields) and drain the UART
+    // until ASIC_task dispatches new work or 30s timeout.
+    {
+        uint32_t wait_start = esp_timer_get_time() / 1000;
+        bool new_work = false;
+        while (!new_work && ((esp_timer_get_time() / 1000) - wait_start < 30000)) {
+            SERIAL_clear_buffer();
+            for (int i = 0; i < ASIC_JOB_SLOTS; i++) {
+                if (APP_CONTEXT.asic.valid_jobs[i]) {
+                    new_work = true;
+                    break;
+                }
+            }
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+        // Let ASICs transition to new work
+        vTaskDelay(pdMS_TO_TICKS(500));
+        SERIAL_clear_buffer();
+    }
+
+    APP_CONTEXT.self_test.running = false;
+
+    vTaskDelete(NULL);
+}
+
+static esp_err_t POST_self_test(httpd_req_t *req)
+{
+    if (is_network_allowed(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+    }
+
+    if (set_cors_headers(req) != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+
+    if (!APP_CONTEXT.asic_initialized) {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_sendstr(req, "{\"error\":\"System still initializing\"}");
+        return ESP_OK;
+    }
+
+    if (APP_CONTEXT.self_test.running) {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_set_status(req, "409 Conflict");
+        httpd_resp_sendstr(req, "{\"error\":\"Self-test already running\"}");
+        return ESP_OK;
+    }
+
+    APP_CONTEXT.self_test.running = true;
+
+    xTaskCreate(runtime_self_test_task, "self_test_rt", 8192, NULL, 5, NULL);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"status\":\"started\"}");
+    return ESP_OK;
+}
+
 void send_log_to_websocket(char *message)
 {
-    // Prepare the WebSocket frame
     httpd_ws_frame_t ws_pkt;
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
     ws_pkt.payload = (uint8_t *)message;
     ws_pkt.len = strlen(message);
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
-    // Ensure server and fd are valid
     if (server != NULL && fd >= 0) {
-        // Send the WebSocket frame asynchronously
         if (httpd_ws_send_frame_async(server, fd, &ws_pkt) != ESP_OK) {
-            // Mark fd as stale; don't disable log_to_queue — a new
-            // websocket connection will set a fresh fd via echo_handler.
             fd = -1;
         }
     }
 
-    // Free the allocated buffer
     free((void*)message);
 }
 
@@ -1125,17 +1242,17 @@ void send_log_to_websocket(char *message)
  * This handler echos back the received ws data
  * and triggers an async send if certain message received
  */
+esp_err_t ws_post_handshake(httpd_req_t *req)
+{
+    fd = httpd_req_to_sockfd(req);
+    esp_log_set_vprintf(log_to_queue);
+    return ESP_OK;
+}
+
 esp_err_t echo_handler(httpd_req_t * req)
 {
     if (is_network_allowed(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
-    }
-
-    if (req->method == HTTP_GET) {
-        ESP_LOGI(TAG, "Handshake done, the new connection was opened");
-        fd = httpd_req_to_sockfd(req);
-        esp_log_set_vprintf(log_to_queue);
-        return ESP_OK;
     }
     return ESP_OK;
 }
@@ -1200,8 +1317,9 @@ esp_err_t start_rest_server(void * pvParameters)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 8192;
-    config.max_open_sockets = 10;
-    config.max_uri_handlers = 24;
+    config.max_open_sockets = 13;
+    config.lru_purge_enable = true;
+    config.max_uri_handlers = 26;
 
     ESP_LOGI(TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
@@ -1341,12 +1459,29 @@ esp_err_t start_rest_server(void * pvParameters)
     };
     httpd_register_uri_handler(server, &update_post_ota_www);
 
+    httpd_uri_t system_selftest_uri = {
+        .uri = "/api/system/selftest",
+        .method = HTTP_POST,
+        .handler = POST_self_test,
+        .user_ctx = rest_context
+    };
+    httpd_register_uri_handler(server, &system_selftest_uri);
+
+    httpd_uri_t system_selftest_options_uri = {
+        .uri = "/api/system/selftest",
+        .method = HTTP_OPTIONS,
+        .handler = handle_options_request,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &system_selftest_options_uri);
+
     httpd_uri_t ws = {
-        .uri = "/api/ws", 
-        .method = HTTP_GET, 
-        .handler = echo_handler, 
-        .user_ctx = NULL, 
-        .is_websocket = true
+        .uri = "/api/ws",
+        .method = HTTP_GET,
+        .handler = echo_handler,
+        .user_ctx = NULL,
+        .is_websocket = true,
+        .ws_post_handshake_cb = ws_post_handshake
     };
     httpd_register_uri_handler(server, &ws);
 

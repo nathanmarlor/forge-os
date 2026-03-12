@@ -49,4 +49,13 @@
         </div>
 
     </div>
+    <div class="col-12 lg:col-6 xl:col-4">
+        <div class="card">
+            <h2>Diagnostics</h2>
+            <p>Run hardware self-test. Mining will pause during the test and resume automatically.</p>
+            <p-button label="Run Self-Test" icon="pi pi-cog" (onClick)="startSelfTest()"></p-button>
+        </div>
+    </div>
 </div>
+
+<app-self-test-dialog [(visible)]="selfTestVisible"></app-self-test-dialog>
