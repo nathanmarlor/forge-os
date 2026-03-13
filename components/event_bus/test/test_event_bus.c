@@ -51,6 +51,9 @@ TEST_CASE("subscribe increments subscriber count", "[event_bus]")
     // Different event type should be unaffected
     TEST_ASSERT_EQUAL(0, event_bus_subscriber_count(EVT_TEMP_UPDATE));
 
+    // Unsubscribe before deleting to avoid dangling pointers in the bus
+    event_bus_unsubscribe(EVT_HASHRATE_UPDATE, q1);
+    event_bus_unsubscribe(EVT_HASHRATE_UPDATE, q2);
     vQueueDelete(q1);
     vQueueDelete(q2);
 }
@@ -65,6 +68,7 @@ TEST_CASE("duplicate subscribe is idempotent", "[event_bus]")
     TEST_ASSERT_EQUAL(ESP_OK, event_bus_subscribe(EVT_POWER_UPDATE, q));
     TEST_ASSERT_EQUAL(1, event_bus_subscriber_count(EVT_POWER_UPDATE));
 
+    event_bus_unsubscribe(EVT_POWER_UPDATE, q);
     vQueueDelete(q);
 }
 
@@ -84,6 +88,9 @@ TEST_CASE("subscribe up to max subscribers", "[event_bus]")
     queues[EVENT_BUS_MAX_SUBSCRIBERS] = xQueueCreate(2, sizeof(event_t));
     TEST_ASSERT_EQUAL(ESP_ERR_NO_MEM, event_bus_subscribe(EVT_CONFIG_CHANGED, queues[EVENT_BUS_MAX_SUBSCRIBERS]));
 
+    for (int i = 0; i < EVENT_BUS_MAX_SUBSCRIBERS; i++) {
+        event_bus_unsubscribe(EVT_CONFIG_CHANGED, queues[i]);
+    }
     for (int i = 0; i <= EVENT_BUS_MAX_SUBSCRIBERS; i++) {
         vQueueDelete(queues[i]);
     }
@@ -164,6 +171,7 @@ TEST_CASE("publish delivers event to single subscriber", "[event_bus]")
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 42.5f, received.data.hashrate.hashrate);
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 1.2f, received.data.hashrate.error_percentage);
 
+    event_bus_unsubscribe(EVT_HASHRATE_UPDATE, q);
     vQueueDelete(q);
 }
 
@@ -199,6 +207,9 @@ TEST_CASE("publish delivers event to multiple subscribers", "[event_bus]")
     TEST_ASSERT_EQUAL(pdTRUE, xQueueReceive(q3, &received, 0));
     TEST_ASSERT_EQUAL(EVT_TEMP_UPDATE, received.type);
 
+    event_bus_unsubscribe(EVT_TEMP_UPDATE, q1);
+    event_bus_unsubscribe(EVT_TEMP_UPDATE, q2);
+    event_bus_unsubscribe(EVT_TEMP_UPDATE, q3);
     vQueueDelete(q1);
     vQueueDelete(q2);
     vQueueDelete(q3);
@@ -230,6 +241,7 @@ TEST_CASE("publish drops event when subscriber queue is full", "[event_bus]")
     // Queue should now be empty
     TEST_ASSERT_EQUAL(pdFALSE, xQueueReceive(q, &received, 0));
 
+    event_bus_unsubscribe(EVT_POWER_UPDATE, q);
     vQueueDelete(q);
 }
 
@@ -256,6 +268,8 @@ TEST_CASE("publish only delivers to subscribers of that event type", "[event_bus
     // Power subscriber should NOT receive it
     TEST_ASSERT_EQUAL(pdFALSE, xQueueReceive(q_power, &received, 0));
 
+    event_bus_unsubscribe(EVT_TEMP_UPDATE, q_temp);
+    event_bus_unsubscribe(EVT_POWER_UPDATE, q_power);
     vQueueDelete(q_temp);
     vQueueDelete(q_power);
 }
@@ -292,6 +306,7 @@ TEST_CASE("config changed event preserves payload", "[event_bus]")
     TEST_ASSERT_EQUAL_STRING("asic_freq", received.data.config.key);
     TEST_ASSERT_EQUAL(550, received.data.config.new_value);
 
+    event_bus_unsubscribe(EVT_CONFIG_CHANGED, q);
     vQueueDelete(q);
 }
 
@@ -339,5 +354,6 @@ TEST_CASE("register read event preserves all fields", "[event_bus]")
     TEST_ASSERT_EQUAL(1, received.data.register_read.asic_nr);
     TEST_ASSERT_EQUAL(0xDEADBEEF, received.data.register_read.value);
 
+    event_bus_unsubscribe(EVT_REGISTER_READ, q);
     vQueueDelete(q);
 }
