@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include "unity.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static void print_banner(const char *text);
 
@@ -14,10 +17,11 @@ void app_main(void)
     // Flush stdout to ensure QEMU serial file output captures the Unity summary
     fflush(stdout);
 
-    // Small delay to allow UART FIFO to drain before exit
-    for (volatile int i = 0; i < 1000000; i++) {}
+    // Allow UART FIFO to drain before reset
+    vTaskDelay(pdMS_TO_TICKS(500));
 
-    exit(0);
+    // Trigger CPU reset — QEMU's -no-reboot flag will cause it to exit cleanly
+    esp_restart();
 }
 
 static void print_banner(const char *text)
