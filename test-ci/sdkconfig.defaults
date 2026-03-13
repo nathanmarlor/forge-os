@@ -1,2 +1,10 @@
 CONFIG_ESP_INT_WDT=n
 CONFIG_ESP_TASK_WDT=n
+
+# Suppress boot logging to prevent QEMU UART FIFO stall.
+# Boot messages fill the FIFO buffer before app_main runs,
+# leaving no room for test output and causing printf to block.
+CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
+CONFIG_BOOTLOADER_LOG_LEVEL=0
+CONFIG_LOG_DEFAULT_LEVEL_NONE=y
+CONFIG_LOG_DEFAULT_LEVEL=0
