@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
@@ -101,6 +102,19 @@ static httpd_handle_t server = NULL;
 QueueHandle_t log_queue = NULL;
 
 static int fd = -1;
+
+/* ---- Log ring buffer for /api/logs (Loki/Promtail) ---- */
+#define LOG_RING_SIZE 128
+#define LOG_RING_MASK (LOG_RING_SIZE - 1)
+
+typedef struct {
+    char *entries[LOG_RING_SIZE];
+    int64_t timestamps[LOG_RING_SIZE];  // microseconds (esp_timer_get_time)
+    uint32_t write_idx;                 // monotonic sequence number
+    portMUX_TYPE lock;
+} log_ring_t;
+
+static log_ring_t s_log_ring = { .lock = portMUX_INITIALIZER_UNLOCKED };
 
 #define REST_CHECK(a, str, goto_tag, ...)                                                                                          \
     do {                                                                                                                           \
@@ -1093,6 +1107,18 @@ int log_to_queue(const char * format, va_list args)
     // Print to standard output
     printf("%s", log_buffer);
 
+    // Write to ring buffer for /api/logs (Promtail/Loki scraping)
+    char *ring_copy = strdup(log_buffer);
+    if (ring_copy) {
+        portENTER_CRITICAL(&s_log_ring.lock);
+        uint32_t idx = s_log_ring.write_idx & LOG_RING_MASK;
+        free(s_log_ring.entries[idx]);
+        s_log_ring.entries[idx] = ring_copy;
+        s_log_ring.timestamps[idx] = esp_timer_get_time();
+        s_log_ring.write_idx++;
+        portEXIT_CRITICAL(&s_log_ring.lock);
+    }
+
     if (xQueueSendToBack(log_queue, (void*)&log_buffer, (TickType_t) 0) != pdPASS) {
         if (log_buffer != NULL) {
             free((void*)log_buffer);
@@ -1276,6 +1302,310 @@ esp_err_t http_404_error_handler(httpd_req_t * req, httpd_err_code_t err)
     return ESP_OK;
 }
 
+/* ---- Prometheus /metrics endpoint ---- */
+
+static void prom_metric(httpd_req_t *req, char *buf, size_t bufsz,
+                        const char *name, const char *help,
+                        const char *type, const char *labels, double val)
+{
+    int n;
+    if (labels) {
+        n = snprintf(buf, bufsz,
+            "# HELP %s %s\n# TYPE %s %s\n%s{%s} %.6g\n",
+            name, help, name, type, name, labels, val);
+    } else {
+        n = snprintf(buf, bufsz,
+            "# HELP %s %s\n# TYPE %s %s\n%s %.6g\n",
+            name, help, name, type, name, val);
+    }
+    httpd_resp_send_chunk(req, buf, n);
+}
+
+#define PROM_GAUGE(req, buf, sz, name, help, val) \
+    prom_metric(req, buf, sz, name, help, "gauge", NULL, (double)(val))
+#define PROM_COUNTER(req, buf, sz, name, help, val) \
+    prom_metric(req, buf, sz, name, help, "counter", NULL, (double)(val))
+#define PROM_GAUGE_L(req, buf, sz, name, help, labels, val) \
+    prom_metric(req, buf, sz, name, help, "gauge", labels, (double)(val))
+
+static esp_err_t GET_metrics(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/plain; version=0.0.4; charset=utf-8");
+
+    stats_module_t *stats = &APP_CONTEXT.stats;
+    power_module_t *pwr = &APP_CONTEXT.power;
+    stratum_module_t *strat = &APP_CONTEXT.stratum;
+    config_module_t *config = &APP_CONTEXT.config;
+
+    char buf[256];
+    char labels[96];
+    int asic_count = ASIC_get_asic_count(APP_CONTEXT.device_model);
+
+    // ---- Hashrate ----
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_hashrate_ghs",
+               "Current hashrate in GH/s", stats->hashrate);
+
+    float expected = (float)config_get_u16(config, NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY)
+        * ASIC_get_small_core_count(APP_CONTEXT.device_model)
+        * asic_count / 1000.0f;
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_hashrate_expected_ghs",
+               "Expected hashrate in GH/s", expected);
+
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_error_percentage",
+               "ASIC error percentage", stats->error_percentage);
+
+    // Per-domain hashrate
+    if (stats->domain_measurements) {
+        for (int d = 0; d < stats->hash_domains; d++) {
+            if (!stats->domain_measurements[d]) continue;
+            for (int a = 0; a < stats->asic_count; a++) {
+                snprintf(labels, sizeof(labels), "asic=\"%d\",domain=\"%d\"", a, d);
+                PROM_GAUGE_L(req, buf, sizeof(buf), "forgeos_domain_hashrate_ghs",
+                             "Per-domain hashrate in GH/s", labels,
+                             stats->domain_measurements[d][a].hashrate);
+            }
+        }
+    }
+
+    // Per-ASIC error rate
+    if (stats->error_measurement) {
+        for (int a = 0; a < stats->asic_count; a++) {
+            snprintf(labels, sizeof(labels), "asic=\"%d\"", a);
+            PROM_GAUGE_L(req, buf, sizeof(buf), "forgeos_asic_error_rate",
+                         "Per-ASIC error rate", labels,
+                         stats->error_measurement[a].hashrate);
+        }
+    }
+
+    // ---- Shares ----
+    PROM_COUNTER(req, buf, sizeof(buf), "forgeos_shares_accepted_total",
+                 "Total accepted shares", stats->shares_accepted);
+    PROM_COUNTER(req, buf, sizeof(buf), "forgeos_shares_rejected_total",
+                 "Total rejected shares", stats->shares_rejected);
+
+    // Per-reason rejected shares
+    for (int i = 0; i < stats->rejected_reason_count; i++) {
+        snprintf(labels, sizeof(labels), "reason=\"%s\"", stats->rejected_reasons[i].message);
+        PROM_GAUGE_L(req, buf, sizeof(buf), "forgeos_shares_rejected_by_reason",
+                     "Rejected shares by reason", labels,
+                     stats->rejected_reasons[i].count);
+    }
+
+    // ---- Difficulty ----
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_best_difficulty",
+               "All-time best nonce difficulty", stats->best_nonce_diff);
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_best_session_difficulty",
+               "Session best nonce difficulty", stats->best_session_nonce_diff);
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_stratum_difficulty",
+               "Current stratum difficulty", strat->stratum_difficulty);
+
+    // Block info
+    if (strat->block_height > 0) {
+        PROM_GAUGE(req, buf, sizeof(buf), "forgeos_block_height",
+                   "Current block height", strat->block_height);
+        PROM_GAUGE(req, buf, sizeof(buf), "forgeos_network_difficulty",
+                   "Network difficulty", strat->network_nonce_diff);
+    }
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_block_found",
+               "Whether a block has been found", stats->found_block ? 1.0 : 0.0);
+
+    // ---- Power ----
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_power_watts",
+               "Input power in watts", pwr->power);
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_voltage_volts",
+               "Input voltage", pwr->voltage);
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_current_amps",
+               "Input current", pwr->current);
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_vr_voltage_volts",
+               "Voltage regulator output voltage",
+               Power_get_vr_voltage(APP_CONTEXT.device_model));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_vr_current_amps",
+               "Voltage regulator output current",
+               Power_get_vr_current(APP_CONTEXT.device_model));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_board_current_amps",
+               "Board input current",
+               Power_get_current(APP_CONTEXT.device_model));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_max_power_watts",
+               "Maximum power setting",
+               Power_get_max_settings(APP_CONTEXT.device_model));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_nominal_voltage_mv",
+               "Nominal voltage in millivolts",
+               Power_get_nominal_voltage(APP_CONTEXT.device_model));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_core_voltage_mv",
+               "Configured core voltage in millivolts",
+               config_get_u16(config, NVS_CONFIG_ASIC_VOLTAGE, CONFIG_ASIC_VOLTAGE));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_core_voltage_actual_mv",
+               "Actual core voltage in millivolts",
+               Power_get_vr_voltage(APP_CONTEXT.device_model));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_power_fault",
+               "Power fault status", APP_CONTEXT.power.power_fault);
+
+    // ---- Temperatures ----
+    for (int i = 0; i < asic_count && i < POWER_MAX_ASICS; i++) {
+        snprintf(labels, sizeof(labels), "chip=\"%d\"", i);
+        PROM_GAUGE_L(req, buf, sizeof(buf), "forgeos_chip_temp_celsius",
+                     "ASIC chip temperature", labels, pwr->chip_temp[i]);
+    }
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_chip_temp_avg_celsius",
+               "Average chip temperature", pwr->chip_temp_avg);
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_vr_temp_celsius",
+               "Voltage regulator temperature", pwr->vr_temp);
+
+    // ---- Fan ----
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_fan_speed_percent",
+               "Fan speed percentage", pwr->fan_perc);
+    PROM_GAUGE_L(req, buf, sizeof(buf), "forgeos_fan_rpm",
+                 "Fan speed in RPM", "fan=\"0\"", pwr->fan_rpm[0]);
+    PROM_GAUGE_L(req, buf, sizeof(buf), "forgeos_fan_rpm",
+                 "Fan speed in RPM", "fan=\"1\"", pwr->fan_rpm[1]);
+
+    // ---- WiFi ----
+    int8_t wifi_rssi = -90;
+    get_wifi_current_rssi(&wifi_rssi);
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_wifi_rssi_dbm",
+               "WiFi signal strength in dBm", wifi_rssi);
+
+    // ---- CPU ----
+    PROM_GAUGE_L(req, buf, sizeof(buf), "forgeos_cpu_percent",
+                 "CPU usage percentage", "core=\"0\"", stats->cpu0_percent);
+    PROM_GAUGE_L(req, buf, sizeof(buf), "forgeos_cpu_percent",
+                 "CPU usage percentage", "core=\"1\"", stats->cpu1_percent);
+
+    // ---- ASIC config ----
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_frequency_mhz",
+               "ASIC frequency in MHz",
+               config_get_u16(config, NVS_CONFIG_ASIC_FREQ, CONFIG_ASIC_FREQUENCY));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_asic_count",
+               "Number of ASICs", asic_count);
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_small_core_count",
+               "Number of small cores per ASIC",
+               ASIC_get_small_core_count(APP_CONTEXT.device_model));
+
+    // ---- Stratum ----
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_stratum_using_fallback",
+               "Using fallback stratum pool", strat->is_using_fallback ? 1.0 : 0.0);
+    if (strat->rtt.ema > 0) {
+        PROM_GAUGE(req, buf, sizeof(buf), "forgeos_stratum_rtt_ema_ms",
+                   "Stratum round-trip time EMA in ms", strat->rtt.ema);
+        PROM_GAUGE(req, buf, sizeof(buf), "forgeos_stratum_rtt_min_ms",
+                   "Stratum round-trip time minimum in ms", strat->rtt.min);
+        PROM_GAUGE(req, buf, sizeof(buf), "forgeos_stratum_rtt_max_ms",
+                   "Stratum round-trip time maximum in ms", strat->rtt.max);
+    }
+
+    // ---- Uptime ----
+    PROM_COUNTER(req, buf, sizeof(buf), "forgeos_uptime_seconds",
+                 "Uptime in seconds",
+                 (esp_timer_get_time() - stats->start_time) / 1000000.0);
+
+    // ---- Heap memory ----
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_free_heap_bytes",
+               "Total free heap", esp_get_free_heap_size());
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_free_heap_internal_bytes",
+               "Free internal heap", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_free_heap_spiram_bytes",
+               "Free SPIRAM heap", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_total_heap_internal_bytes",
+               "Total internal heap", heap_caps_get_total_size(MALLOC_CAP_INTERNAL));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_total_heap_spiram_bytes",
+               "Total SPIRAM heap", heap_caps_get_total_size(MALLOC_CAP_SPIRAM));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_min_free_heap_bytes",
+               "Minimum free internal heap since boot",
+               heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_largest_free_block_bytes",
+               "Largest free block in internal heap",
+               heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_task_count",
+               "Number of FreeRTOS tasks", uxTaskGetNumberOfTasks());
+
+    // ---- Overheat ----
+    PROM_GAUGE(req, buf, sizeof(buf), "forgeos_overheat_mode",
+               "Overheat throttle mode active", pwr->overheat_mode);
+
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
+/* ---- Loki-compatible /api/logs endpoint ---- */
+
+static esp_err_t GET_api_logs(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+
+    // Parse ?start=<cursor> query parameter
+    char query[32] = {0};
+    uint32_t start_cursor = 0;
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        char param[16];
+        if (httpd_query_key_value(query, "start", param, sizeof(param)) == ESP_OK) {
+            start_cursor = (uint32_t)strtoul(param, NULL, 10);
+        }
+    }
+
+    // Snapshot ring buffer state under lock
+    uint32_t current_write_idx;
+    portENTER_CRITICAL(&s_log_ring.lock);
+    current_write_idx = s_log_ring.write_idx;
+    portEXIT_CRITICAL(&s_log_ring.lock);
+
+    // Determine range of available entries
+    uint32_t oldest_available;
+    if (current_write_idx >= LOG_RING_SIZE) {
+        oldest_available = current_write_idx - LOG_RING_SIZE;
+    } else {
+        oldest_available = 0;
+    }
+
+    // Clamp start_cursor to oldest available
+    if (start_cursor < oldest_available) {
+        start_cursor = oldest_available;
+    }
+
+    // Build JSON response in Loki push-compatible format
+    cJSON *root = cJSON_CreateObject();
+    cJSON *streams = cJSON_CreateArray();
+    cJSON *stream_obj = cJSON_CreateObject();
+    cJSON *stream_labels = cJSON_CreateObject();
+    cJSON *values = cJSON_CreateArray();
+
+    char *hostname = config_get_string(&APP_CONTEXT.config, NVS_CONFIG_HOSTNAME, CONFIG_LWIP_LOCAL_HOSTNAME);
+    cJSON_AddStringToObject(stream_labels, "job", "forgeos");
+    cJSON_AddStringToObject(stream_labels, "host", hostname);
+    free(hostname);
+
+    cJSON_AddItemToObject(stream_obj, "stream", stream_labels);
+
+    portENTER_CRITICAL(&s_log_ring.lock);
+    for (uint32_t i = start_cursor; i < current_write_idx; i++) {
+        uint32_t idx = i & LOG_RING_MASK;
+        if (s_log_ring.entries[idx] == NULL) continue;
+
+        cJSON *entry = cJSON_CreateArray();
+        // Loki expects nanosecond timestamps as strings
+        char ts_str[24];
+        snprintf(ts_str, sizeof(ts_str), "%" PRId64 "000", s_log_ring.timestamps[idx]);
+        cJSON_AddItemToArray(entry, cJSON_CreateString(ts_str));
+        cJSON_AddItemToArray(entry, cJSON_CreateString(s_log_ring.entries[idx]));
+        cJSON_AddItemToArray(values, entry);
+    }
+    portEXIT_CRITICAL(&s_log_ring.lock);
+
+    cJSON_AddItemToObject(stream_obj, "values", values);
+    cJSON_AddItemToArray(streams, stream_obj);
+    cJSON_AddItemToObject(root, "streams", streams);
+    cJSON_AddNumberToObject(root, "cursor", current_write_idx);
+
+    char *response = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (response == NULL) {
+        httpd_resp_send_500(req);
+        return ESP_OK;
+    }
+    httpd_resp_sendstr(req, response);
+    free(response);
+    return ESP_OK;
+}
+
 void websocket_log_handler(void *pvParameters)
 {
     (void)pvParameters;
@@ -1324,7 +1654,7 @@ esp_err_t start_rest_server(void * pvParameters)
     config.stack_size = 8192;
     config.max_open_sockets = 13;
     config.lru_purge_enable = true;
-    config.max_uri_handlers = 26;
+    config.max_uri_handlers = 28;
 
     ESP_LOGI(TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
@@ -1336,7 +1666,25 @@ esp_err_t start_rest_server(void * pvParameters)
         .user_ctx = rest_context
     };
     httpd_register_uri_handler(server, &recovery_explicit_get_uri);
-    
+
+    /* Prometheus metrics endpoint — register early to avoid wildcard conflicts */
+    httpd_uri_t metrics_get_uri = {
+        .uri = "/metrics",
+        .method = HTTP_GET,
+        .handler = GET_metrics,
+        .user_ctx = NULL
+    };
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &metrics_get_uri));
+
+    /* Loki/Promtail log scraping endpoint — register early to avoid wildcard conflicts */
+    httpd_uri_t api_logs_get_uri = {
+        .uri = "/api/logs",
+        .method = HTTP_GET,
+        .handler = GET_api_logs,
+        .user_ctx = NULL
+    };
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &api_logs_get_uri));
+
     // Register theme API endpoints
     ESP_ERROR_CHECK(register_theme_api_endpoints(server, rest_context));
 
