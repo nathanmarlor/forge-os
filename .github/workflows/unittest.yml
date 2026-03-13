@@ -25,7 +25,8 @@ jobs:
       run: |
         # Strip --flash-mode/freq/size flags that newer IDF adds to flash_args
         # The QEMU action's merge_bin call can't handle them
-        sed -i '/^--flash/d' test-ci/build/flash_args
+        # Use sudo because the build dir was created inside the Docker container as root
+        sudo sed -i '/^--flash/d' test-ci/build/flash_args
     - name: Run tests and show result
       uses: bitaxeorg/esp32-qemu-test-action@main
       with:
