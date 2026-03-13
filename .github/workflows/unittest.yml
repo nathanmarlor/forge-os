@@ -31,31 +31,19 @@ jobs:
       uses: bitaxeorg/esp32-qemu-test-action@main
       with:
         path: 'test-ci'
-    - name: Find and fix report.xml
+    - name: Inspect QEMU output and generate report
       if: always()
       run: |
+        echo "=== QEMU output.log ==="
+        sudo cat test-ci/build/output.log || echo "output.log not found"
+        echo ""
+        echo "=== Checking for Unity summary line ==="
+        sudo grep -E '[[:digit:]]+ Tests [[:digit:]]+ Failures [[:digit:]]+ Ignored' test-ci/build/output.log || echo "Unity summary line NOT found in output.log"
+        echo ""
         echo "=== Searching for report.xml ==="
-        find . -name 'report.xml' -type f -ls 2>/dev/null || true
-        # The QEMU action writes to /github/workspace inside Docker,
-        # which maps to the repo root. Fix permissions if needed.
-        if [ -f report.xml ]; then
-          echo "=== Found at ./report.xml ==="
-          sudo chmod 644 report.xml 2>/dev/null || true
-          cat report.xml
-        elif [ -f test-ci/report.xml ]; then
-          echo "=== Found at test-ci/report.xml ==="
-          sudo cp test-ci/report.xml report.xml
-          cat report.xml
-        elif [ -f test-ci/build/report.xml ]; then
-          echo "=== Found at test-ci/build/report.xml ==="
-          sudo cp test-ci/build/report.xml report.xml
-          cat report.xml
-        else
-          echo "=== report.xml not found anywhere ==="
-          ls -la . test-ci/ test-ci/build/ 2>/dev/null || true
-        fi
+        find . -name 'report.xml' -type f -ls 2>/dev/null || echo "report.xml not found"
     - name: Publish Unit Test Results
       uses: EnricoMi/publish-unit-test-result-action@v1
       if: always()
       with:
-          files: report.xml
+          files: "**/report.xml"
