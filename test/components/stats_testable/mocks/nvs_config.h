@@ -8,6 +8,7 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 
 // Key defines (must match real nvs_config.h)
@@ -48,27 +49,12 @@
 #define NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE "fbstratumdecode"
 
 // Mock storage — single u64 slot is enough for stats tests
-static uint64_t _mock_nvs_u64_value = 0;
-static bool _mock_nvs_u64_set = false;
+// Declared extern so all translation units share the same state
+extern uint64_t _mock_nvs_u64_value;
+extern bool _mock_nvs_u64_set;
 
-static inline uint64_t nvs_config_get_u64(const char *key, uint64_t default_val)
-{
-    (void)key;
-    return _mock_nvs_u64_set ? _mock_nvs_u64_value : default_val;
-}
-
-static inline void nvs_config_set_u64(const char *key, uint64_t value)
-{
-    (void)key;
-    _mock_nvs_u64_value = value;
-    _mock_nvs_u64_set = true;
-}
-
-// Reset mock state between tests
-static inline void mock_nvs_reset(void)
-{
-    _mock_nvs_u64_value = 0;
-    _mock_nvs_u64_set = false;
-}
+uint64_t nvs_config_get_u64(const char *key, uint64_t default_val);
+void nvs_config_set_u64(const char *key, uint64_t value);
+void mock_nvs_reset(void);
 
 #endif /* MOCK_NVS_CONFIG_H */

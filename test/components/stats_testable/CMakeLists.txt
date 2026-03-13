@@ -3,6 +3,7 @@
 # with NVS functions mocked via shadowed headers.
 idf_component_register(
     SRCS "${CMAKE_CURRENT_LIST_DIR}/../../../main/modules/stats/stats.c"
+         "mocks/mock_nvs.c"
     INCLUDE_DIRS
         "${CMAKE_CURRENT_LIST_DIR}/../../../main/modules/stats"
         "mocks"

@@ -58,7 +58,7 @@ TEST_CASE("Validate another merkle root calculation", "[mining]")
 }
 
 // Values calculated from esp-miner/components/stratum/test/verifiers/bm1397.py
-TEST_CASE("Validate bm job construction", "[mining]")
+TEST_CASE("Validate bm job construction", "[mining][not-on-qemu]")
 {
     mining_notify notify_message;
     notify_message.prev_block_hash = "bf44fd3513dc7b837d60e5c628b572b448d204a8000007490000000000000000";

@@ -224,6 +224,10 @@ void stats_notify_rejected_share(stats_module_t *stats, const char *error_msg)
         if (strncmp(stats->rejected_reasons[i].message, error_msg,
                     sizeof(stats->rejected_reasons[i].message) - 1) == 0) {
             stats->rejected_reasons[i].count++;
+            if (stats->rejected_reason_count > 1) {
+                qsort(stats->rejected_reasons, stats->rejected_reason_count,
+                      sizeof(stats->rejected_reasons[0]), compare_rejected_reasons);
+            }
             pthread_mutex_unlock(&stats->share_lock);
             return;
         }
