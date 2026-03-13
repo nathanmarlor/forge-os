@@ -2,6 +2,7 @@
 #include <string.h>
 #include "unity.h"
 #include "esp_system.h"
+#include "esp_rom_uart.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -14,13 +15,16 @@ void app_main(void)
     unity_run_tests_by_tag("[not-on-qemu]", true);
     UNITY_END();
 
-    // Flush stdout to ensure QEMU serial file output captures the Unity summary
+    // Ensure all output reaches QEMU's serial file backend:
+    // 1. Flush C stdio buffers
     fflush(stdout);
+    fflush(stderr);
+    // 2. Wait for UART TX FIFO to drain
+    esp_rom_uart_tx_wait_idle(0);
+    // 3. Give QEMU time to flush its file backend
+    vTaskDelay(pdMS_TO_TICKS(3000));
 
-    // Allow UART FIFO to drain before reset
-    vTaskDelay(pdMS_TO_TICKS(500));
-
-    // Trigger CPU reset — QEMU's -no-reboot flag will cause it to exit cleanly
+    // Trigger CPU reset — QEMU's -no-reboot flag will exit cleanly
     esp_restart();
 }
 
