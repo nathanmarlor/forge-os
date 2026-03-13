@@ -31,14 +31,31 @@ jobs:
       uses: bitaxeorg/esp32-qemu-test-action@main
       with:
         path: 'test-ci'
-    - name: Find report.xml
+    - name: Find and fix report.xml
       if: always()
-      run: find . -name 'report.xml' -type f 2>/dev/null || echo "No report.xml found"
-    - name: Inspect log
-      if: always()
-      run: cat report.xml 2>/dev/null || cat test-ci/report.xml 2>/dev/null || echo "report.xml not found in expected locations"
+      run: |
+        echo "=== Searching for report.xml ==="
+        find . -name 'report.xml' -type f -ls 2>/dev/null || true
+        # The QEMU action writes to /github/workspace inside Docker,
+        # which maps to the repo root. Fix permissions if needed.
+        if [ -f report.xml ]; then
+          echo "=== Found at ./report.xml ==="
+          sudo chmod 644 report.xml 2>/dev/null || true
+          cat report.xml
+        elif [ -f test-ci/report.xml ]; then
+          echo "=== Found at test-ci/report.xml ==="
+          sudo cp test-ci/report.xml report.xml
+          cat report.xml
+        elif [ -f test-ci/build/report.xml ]; then
+          echo "=== Found at test-ci/build/report.xml ==="
+          sudo cp test-ci/build/report.xml report.xml
+          cat report.xml
+        else
+          echo "=== report.xml not found anywhere ==="
+          ls -la . test-ci/ test-ci/build/ 2>/dev/null || true
+        fi
     - name: Publish Unit Test Results
       uses: EnricoMi/publish-unit-test-result-action@v1
       if: always()
       with:
-          files: "**/report.xml"
+          files: report.xml
