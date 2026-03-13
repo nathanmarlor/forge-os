@@ -2,7 +2,7 @@
 #include <string.h>
 #include "unity.h"
 #include "esp_system.h"
-#include "esp_rom_uart.h"
+#include "esp_rom_serial_output.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -20,7 +20,7 @@ void app_main(void)
     fflush(stdout);
     fflush(stderr);
     // 2. Wait for UART TX FIFO to drain
-    esp_rom_uart_tx_wait_idle(0);
+    esp_rom_output_tx_wait_idle(0);
     // 3. Give QEMU time to flush its file backend
     vTaskDelay(pdMS_TO_TICKS(3000));
 
