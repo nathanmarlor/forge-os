@@ -31,10 +31,14 @@ jobs:
       uses: bitaxeorg/esp32-qemu-test-action@main
       with:
         path: 'test-ci'
+    - name: Find report.xml
+      if: always()
+      run: find . -name 'report.xml' -type f 2>/dev/null || echo "No report.xml found"
     - name: Inspect log
-      run: cat report.xml
+      if: always()
+      run: cat report.xml 2>/dev/null || cat test-ci/report.xml 2>/dev/null || echo "report.xml not found in expected locations"
     - name: Publish Unit Test Results
       uses: EnricoMi/publish-unit-test-result-action@v1
       if: always()
       with:
-          files: report.xml
+          files: "**/report.xml"
